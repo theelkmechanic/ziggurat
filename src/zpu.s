@@ -46,7 +46,6 @@ window_status: .res 1
 window_debug: .res 1
 current_window: .res 1
 zm_windows: .res 8
-main_window_buffer: .res 80*4
 
 .code
 
@@ -349,9 +348,8 @@ main_window_buffer: .res 80*4
     lda zm_windows
     ldx #(COLOR::WHITE << 4) + COLOR::GRAY1
     jsr win_setcolor
-    ldx #>main_window_buffer
-    ldy #<main_window_buffer
-    jsr win_enablebuffer
+    ldx #1
+    jsr win_setbuffer
     jsr win_clear
     ldx #0
     ldy #SCREEN_HEIGHT-1
@@ -363,7 +361,8 @@ main_window_buffer: .res 80*4
     jsr win_setpos
     ldx #(COLOR::BLUE << 4) + COLOR::WHITE
     jsr win_setcolor
-    jsr win_disablebuffer
+    ldx #0
+    jsr win_setbuffer
     jsr win_clear
 
 @nodebugwindow:
@@ -373,7 +372,7 @@ main_window_buffer: .res 80*4
     jsr win_setcolor
     ldx #0
     jsr win_setwrap
-    jsr win_disablebuffer
+    jsr win_setbuffer
 
 @start_zmachine:
     ; Hey, just for shits and giggles, let's print all the Unicode characters we can, followed
@@ -1299,7 +1298,7 @@ opcode_vectors_upper:
     .word op_storew                     ; Opcode $e1 - storew array word-index value
     .word op_storeb                     ; Opcode $e2 - storeb array byte-index value
     .word op_put_prop                   ; Opcode $e3 - put_prop object property value
-    .word op_sread                      ; Opcode $e4 - versions 1-3: sread text parse
+    .word op_read                       ; Opcode $e4 - versions 1-3: sread text parse
                                         ;            - version 4: sread text parse time routine
                                         ;            - versions 5+: aread text parse time routine -> (result)
     .word op_print_char                 ; Opcode $e5 - print_char output-character-code
@@ -1348,6 +1347,7 @@ error_msg_list:
     .word error_msg_invalid_param
     .word error_msg_illegal_extended
     .word error_msg_invalid_property
+    .word error_msg_invalid_parse_char
     .word error_msg_todo
 
 hexchars:                       .byte   "0123456789abcdef"
@@ -1364,4 +1364,5 @@ error_msg_stack_empty:          .byte "Can't pop from empty stack", 0
 error_msg_invalid_param:        .byte "Invalid parameters", 0
 error_msg_illegal_extended:     .byte "Illegal extended opcode #", 0
 error_msg_invalid_property:     .byte "Invalid property obj @ prop @", 0
+error_msg_invalid_parse_char:   .byte "Invalid character # in word while parsing", 0
 error_msg_todo:                 .byte "Unimplemented, TODO", 0

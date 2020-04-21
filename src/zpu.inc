@@ -16,6 +16,11 @@
 .global mem_advance_block
 .global mem_advance
 .global mem_retreat
+.global mem2_fetch_and_advance
+.global mem2_store_and_advance
+.global mem2_advance_block
+.global mem2_advance
+.global mem2_retreat
 .global read_array_byte
 .global read_array_word
 .global write_array_byte
@@ -24,6 +29,7 @@
 .global store_varvalue
 .global follow_branch
 .global print_encoded
+.global convert_zsciihigh_to_unicode
 .global show_status
 
 .global numtobit
@@ -135,6 +141,7 @@
 .global op_put_prop
 .global op_quit
 .global op_random
+.global op_read
 .global op_read_char
 .global op_remove_obj
 .global op_restart
@@ -153,7 +160,6 @@
 .global op_show_status
 .global op_sound_effect
 .global op_split_window
-.global op_sread
 .global op_store
 .global op_storeb
 .global op_storew
@@ -235,7 +241,7 @@
 .global zm_windows
 
 .define SHOW_DEBUG_WINDOW 1
-.define SCREEN_HEIGHT 25
+.define SCREEN_HEIGHT 5
 .define SCREEN_WIDTH 80
 .define FONT_WIDTH 4
 .define FONT_HEIGHT 8

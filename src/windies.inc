@@ -5,8 +5,7 @@
 .global win_clearline
 .global win_getflags
 .global win_setwrap
-.global win_enablebuffer
-.global win_disablebuffer
+.global win_setbuffer
 .global win_flushbuffer
 .global win_getpos
 .global win_setpos
@@ -20,7 +19,12 @@
 .global win_setfont
 .global win_putchr
 .global win_scroll
-.global win_readln
+.global win_getscrlcnt
+.global win_resetscrlcnt
 
 .global utf_xlat_default
 .global utf_xlat_addr
+
+WIN_ISOPEN = $80
+WIN_BUFFER = $40
+WIN_WRAP = $20

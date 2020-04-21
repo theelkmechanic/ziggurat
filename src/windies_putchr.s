@@ -372,6 +372,15 @@ drawchar_color_flags = $798
     rts
 .endproc
 
+; win_flushbuffer - Print any text in a window's buffer to the screen
+; In:   a           - Window ID (0-MAX_WINDOWS-1)
+.proc win_flushbuffer
+    ; Get the window table entry pointer and flush it
+    jsr win_getptr
+
+    ; FALL THRU INTENTIONAL
+.endproc
+
 ; curwin_flushbuffer - Print any text in the current window's buffer to the screen
 .proc curwin_flushbuffer
 @buf_off = $760 

@@ -402,13 +402,12 @@ extend_bra_store_math_result:
     bpl @getrandom_range
 
     ; Invert the value and store it in the seed
-    lda operand_0+1
-    eor #$ff
-    adc #1
+    lda #0
+    sec
+    sbc operand_0+1
     sta random_seed+1
-    lda operand_0
-    eor #$ff
-    adc #0
+    lda #0
+    sbc operand_0
     sta random_seed
 
     ; Return 0 when we set the seed

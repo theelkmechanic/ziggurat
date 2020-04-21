@@ -20,8 +20,16 @@
 .proc show_status
 @g2 = $480
 @g3 = $482
-@timeflags = $484
+@save_op0 = $484
+@timeflags = $486
     ; Start with a space
+    pha
+    phx
+    phy
+    lda operand_0
+    sta @save_op0
+    lda operand_0+1
+    sta @save_op0+1
     lda window_status
     ldx #0
     ldy #0
@@ -159,6 +167,13 @@
     jsr win_getcursor
     cpx #80
     bcc @finish_status
+    lda @save_op0
+    sta operand_0
+    lda @save_op0+1
+    sta operand_0+1
+    ply
+    plx
+    pla
     rts
 .endproc
 
@@ -277,14 +292,14 @@
 .proc op_split_window
     jmp op_illegal
 
-@main_left = $400
-@main_top = $401
-@main_width = $402
-@main_height = $403
-@main_cur_x = $404
-@main_cur_y = $405
-@upper_height = $406
-@upper_diff = $407
+@main_left = $420
+@main_top = $421
+@main_width = $422
+@main_height = $423
+@main_cur_x = $424
+@main_cur_y = $425
+@upper_height = $426
+@upper_diff = $427
 
     lda #<msg_op_split_window
     sta gREG::r6L

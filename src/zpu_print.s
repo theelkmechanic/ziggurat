@@ -264,8 +264,17 @@ print_addr_in_xya:
     sbc #6
     clc
     adc alphabet_offset
-    tay
-    lda (atab_addr),y
+    pha
+    lda atab_addr
+    sta zpu_mem_2
+    lda atab_addr+1
+    sta zpu_mem_2+1
+    lda atab_addr+2
+    sta zpu_mem_2+2
+    sta VIA1::PRA
+    pla
+    jsr mem2_advance
+    lda (zpu_mem_2)
 
     ; Clear the alphabet offset for next time
     ; TODO: FIX FOR V1/2
@@ -475,58 +484,10 @@ print_zscii:
     bra @print_it
 
 @check_high:
-    ; Characters from 155 on up we have to convert using the alphabet table
+    ; Characters from 155 on up we have to convert using the Unicode table
     cmp #155
     bcc @done
-    sec
-    sbc #155
-    sta zscii_work
-
-    ; Save zpu_mem and switch to atab_addr
-    lda zpu_mem
-    sta zscii_zmem_save
-    lda zpu_mem+1
-    sta zscii_zmem_save+1
-    lda zpu_mem+2
-    sta zscii_zmem_save+2
-    lda atab_addr
-    sta zpu_mem
-    lda atab_addr+1
-    sta zpu_mem+1
-    lda atab_addr+2
-    sta zpu_mem+2
-    ldx VIA1::PRA
-    phx
-    sta VIA1::PRA
-
-    ; See if we have the specified character in our table
-    jsr mem_fetch_and_advance
-    cmp zscii_work
-    bcs @restore_zmem
-
-    ; It's in the table, so load it into x/y
-    lda zscii_work
-    asl
-    beq @1
-    jsr mem_advance
-@1: jsr mem_fetch_and_advance
-    tax
-    lda (zpu_mem)
-    tay
-
-    ; And flag that we found it
-    clc
-
-@restore_zmem:
-    ; Restore previous bank and zpu_mem
-    pla
-    sta VIA1::PRA
-    lda zscii_zmem_save
-    sta zpu_mem
-    lda zscii_zmem_save+1
-    sta zpu_mem+1
-    lda zscii_zmem_save+2
-    sta zpu_mem+2
+    jsr convert_zsciihigh_to_unicode
 
     ; If carry is set at this point, we didn't find it
     bcs @done
@@ -540,6 +501,47 @@ print_zscii:
 @done:
     plx
     ply
+    rts
+.endproc
+
+.proc convert_zsciihigh_to_unicode
+    sec
+    sbc #155
+    sta zscii_work
+
+    ; Switch to Unicode table
+    lda utf_xlat_addr
+    sta zpu_mem_2
+    lda utf_xlat_addr+1
+    sta zpu_mem_2+1
+    lda utf_xlat_addr+2
+    sta zpu_mem_2+2
+    ldx VIA1::PRA
+    phx
+    sta VIA1::PRA
+
+    ; See if we have the specified character in our table
+    jsr mem2_fetch_and_advance
+    cmp zscii_work
+    bcc @restore_bank
+
+    ; It's in the table, so load it into x/y
+    lda zscii_work
+    asl
+    beq @1
+    jsr mem2_advance
+@1: jsr mem2_fetch_and_advance
+    tax
+    lda (zpu_mem_2)
+    tay
+
+    ; And flag that we found it
+    clc
+
+@restore_bank:
+    ; Restore previous bank
+    pla
+    sta VIA1::PRA
     rts
 .endproc
 

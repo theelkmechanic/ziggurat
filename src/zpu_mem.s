@@ -578,14 +578,70 @@ x2loop:
 
 mem_advance_finish:
     inc zpu_mem+1
-    bit zpu_mem+1
-    bvc mem_advance_skip
+    lda zpu_mem+1
+    cmp #$c0
+    bcc mem_advance_skip
     lda #$a0
     sta zpu_mem+1
     inc zpu_mem+2
     lda zpu_mem+2
     sta VIA1::PRA
 mem_advance_skip:
+    pla
+    rts
+
+; mem2_fetch_and_advance - Fetch the next byte at the mem_2 register and advance by 1
+; (Note: Assumes bank is correctly set beforehand)
+.proc mem2_fetch_and_advance
+    lda (zpu_mem_2)
+    pha
+    inc zpu_mem_2
+    beq mem2_advance_finish
+    pla
+    rts
+.endproc
+
+; mem2_store_and_advance - Store a at the mem_2 register and advance by 1
+; (Note: Assumes bank is correctly set beforehand)
+.proc mem2_store_and_advance
+    sta (zpu_mem_2)
+    pha
+    inc zpu_mem_2
+    beq mem2_advance_finish
+    pla
+    rts
+.endproc
+
+; mem2_advance_block - Advance mem_2 register by 256 bytes
+; (Note: Assumes bank is correctly set beforehand)
+.proc mem2_advance_block
+    pha
+    bra mem2_advance_finish
+.endproc
+
+; mem2_advance - Advance mem_2 register by value in a
+; (Note: Assumes bank is correctly set beforehand)
+.proc mem2_advance
+    pha
+    clc
+    adc zpu_mem_2
+    sta zpu_mem_2
+    bcc mem2_advance_skip
+
+    ; FALL THRU INTENTIONAL
+.endproc
+
+mem2_advance_finish:
+    inc zpu_mem_2+1
+    lda zpu_mem_2+1
+    cmp #$c0
+    bcc mem2_advance_skip
+    lda #$a0
+    sta zpu_mem_2+1
+    inc zpu_mem_2+2
+    lda zpu_mem_2+2
+    sta VIA1::PRA
+mem2_advance_skip:
     pla
     rts
 
@@ -631,12 +687,34 @@ mem_advance_skip:
     bcs @mem_retreat_skip
     dec zpu_mem+1
     lda zpu_mem+1
-    cmp #$a0
-    bcs @mem_retreat_skip
+    cmp #$9f
+    bne @mem_retreat_skip
     lda #$bf
     sta zpu_mem+1
     dec zpu_mem+2
     lda zpu_mem+2
+    sta VIA1::PRA
+@mem_retreat_skip:
+    lda retreat_save
+    rts
+.endproc
+
+; mem2_retreat - Move mem2 register down by value in a
+.proc mem2_retreat
+    sta retreat_save
+    lda zpu_mem_2
+    sec
+    sbc retreat_save
+    sta zpu_mem_2
+    bcs @mem_retreat_skip
+    dec zpu_mem_2+1
+    lda zpu_mem_2+1
+    cmp #$9f
+    bne @mem_retreat_skip
+    lda #$bf
+    sta zpu_mem_2+1
+    dec zpu_mem_2+2
+    lda zpu_mem_2+2
     sta VIA1::PRA
 @mem_retreat_skip:
     lda retreat_save

@@ -2,6 +2,12 @@
 .include "cbm_kernal.inc"
 .include "windies_impl.inc"
 
+.bss
+
+win_buffers: .res 80*4*8
+
+buf_off = $720
+
 .code
 
 ; win_init - Initialize the window system
@@ -204,62 +210,80 @@ win_get_word_to_xy:
     pla
     rts
 
-; win_disablebuffer - Clear window buffer flag
+; win_setbuffer - Clear window buffer flag
 ; In:   a           - Window ID (0-MAX_WINDOWS-1)
-;       x           - Wrap flag (0 = disabled, non-zero = enabled)
-.proc win_disablebuffer
+;       x           - Buffering flag (0 = disabled, non-zero = enabled)
+.proc win_setbuffer
     ; Get the window table entry pointer
     jsr win_getptr
 
-    ; If we're buffering, flush the buffer now just in case
+    ; Are we turning on buffering?
     pha
     lda (win_ptr)
-    bit #WIN_BUFFER
-    beq @noflush
-    jsr curwin_flushbuffer
+    cpx #0
+    bne @buffer_on
 
-@noflush:
+    ; If we're turning off buffering, flush the buffer now just in case
+    bit #WIN_BUFFER
+    beq @buffer_off
+    jsr curwin_flushbuffer
+    bra @buffer_off
+
+@buffer_on:
+    ; Is buffering already on?
+    bit #WIN_BUFFER
+    bne @done
+
+    ; Find the buffer to use (win_buffers + (80*4) * window ID). ID * 320 is the same as ID * 256 + ID * 64,
+    ; so we can shift ID right 6 bits, and then add ID to the high byte.
+    pla
+    pha
+    tax
+    stz buf_off+1
+    asl
+    rol buf_off+1
+    asl
+    rol buf_off+1
+    asl
+    rol buf_off+1
+    asl
+    rol buf_off+1
+    asl
+    rol buf_off+1
+    asl
+    rol buf_off+1
+    sta buf_off
+    txa
+    clc
+    adc buf_off+1
+    sta buf_off+1
+
+    ; Then add the buffer base and store in the window buffer address
+    phy
+    ldy #Window::bufptr
+    lda #<win_buffers
+    clc
+    adc buf_off
+    iny
+    sta (win_ptr),y
+    lda #>win_buffers
+    adc buf_off
+    dey
+    sta (win_ptr),y
+    ply
+
+    ; Set the buffering flag
+    lda (win_ptr)
+    ora #WIN_BUFFER
+    .byte $2c ; Skip next and
+
+@buffer_off:
     ; Clear the buffering flag
     and #($FF & ~WIN_BUFFER)
     sta (win_ptr)
+@done:
     pla
     rts
-.endproc
-
-; win_flushbuffer - Print any text in a window's buffer to the screen
-; In:   a           - Window ID (0-MAX_WINDOWS-1)
-.proc win_flushbuffer
-    ; Get the window table entry pointer and flush it
-    jsr win_getptr
-
-    ; FALL THRU INTENTIONAL
-.endproc
-
-; win_enablebuffer - Enable buffering and set buffer pointer
-; In:   a           - Window ID (0-31)
-;       x           - Buffer pointer (high byte)
-;       y           - Buffer pointer (low byte)
-.proc win_enablebuffer
-    ; Get the window table entry pointer
-    jsr win_getptr
-
-    ; Set the buffering flag
-    pha
-    lda (win_ptr)
-    ora #WIN_BUFFER
-    sta (win_ptr)
-
-    ; Reset the buffer offset
-    phy
-    ldy #Window::bufoff
-    lda #0
-    sta (win_ptr),y
-    ply
-    phy
-
-    ; Skip to buffer pointer and store
-    lda #Window::bufptr
-    bra win_set_word_from_xy
 .endproc
 
 ; win_setpos - Set window top-left position
@@ -343,11 +367,43 @@ win_set_word_from_xy:
     pha
     phy
     ldy #Window::colors
+
+    ; FALL THRU INTENTIONAL
+.endproc
+
+read_x_from_y:
     lda (win_ptr),y
     tax
     ply
     pla
     rts
+
+; win_getscrlcnt - Get window scroll count
+; In:   a           - Window ID (0-MAX_WINDOWS-1)
+; Out:  x           - Window scroll count (# of lines scrolled)
+.proc win_getscrlcnt
+    ; Get the window table entry pointer
+    jsr win_getptr
+
+    ; And read the scroll count
+    pha
+    phy
+    ldy #Window::scrlcnt
+    bra read_x_from_y
+.endproc
+
+; win_resetscrlcnt - Reset the window scroll count to 0
+; In:   a           - Window ID (0-MAX_WINDOWS-1)
+.proc win_resetscrlcnt
+    ; Get the window table entry pointer
+    jsr win_getptr
+
+    ; And reset the scroll count
+    pha
+    phy
+    ldy #Window::scrlcnt
+    lda #0
+    bra set_y_from_a
 .endproc
 
 ; win_setcolor - Set window foreground/background colors
@@ -362,11 +418,15 @@ win_set_word_from_xy:
     phy
     ldy #Window::colors
     txa
+
+    ; FALL THRU INTENTIONAL
+.endproc
+
+set_y_from_a:
     sta (win_ptr),y
     ply
     pla
     rts
-.endproc
 
 ; win_clear - Clear specified window to its fg/bg colors
 ; In:   a           - Window ID (0-MAX_WINDOWS-1)
