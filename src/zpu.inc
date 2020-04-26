@@ -31,6 +31,7 @@
 .global print_encoded
 .global convert_zsciihigh_to_unicode
 .global show_status
+.global negate_xy
 
 .global numtobit
 .global atab_default
@@ -241,7 +242,7 @@
 .global zm_windows
 
 .define SHOW_DEBUG_WINDOW 1
-.define SCREEN_HEIGHT 5
+.define SCREEN_HEIGHT 20
 .define SCREEN_WIDTH 80
 .define FONT_WIDTH 4
 .define FONT_HEIGHT 8

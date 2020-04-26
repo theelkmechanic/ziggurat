@@ -301,7 +301,12 @@ set_or_clear = $400
 
     ; Get the object's current parent
     jsr get_parent
-    stx operand_2
+    cpx #0
+    bne @1
+    cpy #0
+    bne @1
+    rts ; No parent, so we're done
+@1: stx operand_2
     sty operand_2+1
 
     ; Get the object's current sibling

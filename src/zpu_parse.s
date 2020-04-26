@@ -887,13 +887,11 @@ op_input_stream:
     bpl @do_binary_search
 
     ; Negate the entry count and do a linear search
-    lda #0
-    sec
-    sbc entry_count
-    sta entry_count
-    lda #0
-    sbc entry_count+1
-    sta entry_count+1
+    ldx entry_count+1
+    ldy entry_count
+    jsr negate_xy
+    stx entry_count+1
+    sty entry_count
 
     ; Start at index 0
     stz curr_idx

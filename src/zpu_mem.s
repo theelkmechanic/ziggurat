@@ -1034,16 +1034,13 @@ mem2_advance_skip:
     sta @iscopy
 
     ; If size is negative, we have to copy up (and turn size positive)
-    bit operand_2
+    bit @size
     bpl @ispositive
-    lda #$80
-    lda #0
-    sec
-    sbc @size+1
-    sta @size+1
-    lda #0
-    sbc @size
-    sta @size
+    ldx @size
+    ldy @size+1
+    jsr negate_xy
+    stx @size
+    sty @size+1
     bra @copy_up
 
 @ispositive:

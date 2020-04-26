@@ -4,7 +4,7 @@
 
 .segment "EXEHDR"
     ; Stub launcher
-    .byte $0b, $08, $b0, $1f, $9e, $32, $30, $36, $31, $00, $00, $00
+    .byte $0b, $08, $b0, $00, $9e, $32, $30, $36, $31, $00, $00, $00
 
 .segment "LOWCODE"
     ; Load the specified file into high memory

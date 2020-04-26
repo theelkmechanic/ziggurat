@@ -3,6 +3,8 @@
 
 do_check_flag = $400
 do_arith_shift_flag = $400
+want_remainder = $400
+muldiv_sign = $401
 
 .code
 
@@ -117,32 +119,47 @@ do_arith_shift_flag = $400
     sta gREG::r6H
     jsr printf
 
+    ; Figure out result sign and negate operands if we need to
+    jsr init_muldiv_sign
+
     ; We will use r2 for the result
     stz operand_2
     stz operand_2+1
 
-    ; Loop through the 16 bits, adding r1 into the result for each bit in r0 that
-    ; is set, and multiplying the result by two each time
-    ldx #16
-@1: asl operand_2+1
-    rol operand_2
+@loop:
+    ; Loop while operand_1 is non-zero
+    lda operand_1
+    ora operand_1+1
+    beq @done
+
+    ; If operand_1 is odd, add operand_0 to product
+    lda operand_1+1
+    and #1
+    beq @rotate
+    lda operand_0+1
+    clc
+    adc operand_2+1
+    sta operand_2+1
+    lda operand_0
+    adc operand_2
+    sta operand_2
+
+@rotate:
+    ; For next round, multiply operand_0 by 2 and divide operand_1 by 2
     asl operand_0+1
     rol operand_0
-    bcc @2
-    clc
-    lda operand_2+1
-    adc operand_1+1
-    sta operand_2+1
-    lda operand_2
-    adc operand_1
-    sta operand_2
-@2: dex
-    bpl @1
+    lsr operand_1
+    ror operand_1+1
+    bra @loop
 
-    ; Move result into x/y and store it
+@done:
+    ; Move 16-bit result into x/y and store it
     ldx operand_2
     ldy operand_2+1
-    bra store_math_result
+    bit muldiv_sign
+    bpl @1
+    jsr negate_xy
+@1: bra store_math_result
 .endproc
 
 .proc op_add
@@ -257,9 +274,8 @@ store_math_var:
 .endproc
 
 .proc op_mod
-want_remainder = $400
     ; Do division and return remainder
-    lda #1
+    lda #$80
     sta want_remainder
     bne @doing_mod
     ldy #<msg_op_div
@@ -272,6 +288,9 @@ want_remainder = $400
     sty gREG::r6L
     stx gREG::r6H
     jsr printf
+
+    ; Figure out result sign and negate operands if we need to
+    jsr init_muldiv_sign
 
     ; Clear the remainder in r3
     stz operand_3
@@ -287,35 +306,35 @@ want_remainder = $400
     sec
     lda operand_3+1
     sbc operand_1+1
-    sta operand_3+1
+    tay
     lda operand_3
     sbc operand_1
+    bcc @2
     sta operand_3
-    bcs @2
-    lda operand_3+1
-    adc operand_1+1
-    sta operand_1+1
-    lda operand_3
-    adc operand_1
-    sta operand_3
-@2: rol operand_2+1
+    sty operand_3+1
+    rol operand_2+1
     rol operand_2
-    dex
-    bpl @1
+@2: dex
+    bne @1
 
     ; Now which result do we want
-    lda want_remainder
-    beq @store_remainder
+    bit want_remainder
+    bmi @store_remainder
 
     ; Move quotient into x/y and store it
     ldx operand_2
     ldy operand_2+1
-    bra store_math_result
+    bra @check_sign_and_store_math_result
 
 @store_remainder:
     ; Move remainder into x/y and store it
     ldx operand_3
     ldy operand_3+1
+
+@check_sign_and_store_math_result:
+    bit muldiv_sign
+    bpl store_math_result
+    jsr negate_xy
 .endproc
 extend_bra_store_math_result:
     bra store_math_result
@@ -390,6 +409,55 @@ extend_bra_store_math_result:
     bra extend_bra_store_math_result
 .endproc
 
+.proc negate_xy
+    ; Negate value in x/y (x=hi, y=lo)
+    pha
+    stx gREG::r10H
+    sty gREG::r10L
+    lda #0
+    sec
+    sbc gREG::r10L
+    tay
+    lda #0
+    sbc gREG::r10H
+    tax
+    pla
+    rts
+.endproc
+
+.proc init_muldiv_sign
+    ; Figure out sign of result
+    ldx #0
+    bit operand_0
+    bpl @1
+    inx
+@1: bit operand_1
+    bpl @2
+    inx
+@2: txa
+    lsr
+    ror
+    sta muldiv_sign
+
+    ; Now flip operands that are negative to be positive instead
+    bit operand_0
+    bpl @3
+    ldx operand_0
+    ldy operand_0+1
+    jsr negate_xy
+    stx operand_0
+    sty operand_0+1
+
+@3: bit operand_1
+    bpl @4
+    ldx operand_1
+    ldy operand_1+1
+    jsr negate_xy
+    stx operand_1
+    sty operand_1+1
+@4: rts
+.endproc
+
 .proc op_random
     ; If range is 0, seed with a random value
     ldy operand_0+1
@@ -402,13 +470,11 @@ extend_bra_store_math_result:
     bpl @getrandom_range
 
     ; Invert the value and store it in the seed
-    lda #0
-    sec
-    sbc operand_0+1
-    sta random_seed+1
-    lda #0
-    sbc operand_0
-    sta random_seed
+    ldx operand_0
+    ldy operand_0+1
+    jsr negate_xy
+    stx random_seed
+    sty random_seed+1
 
     ; Return 0 when we set the seed
 @return_0:
@@ -444,9 +510,6 @@ extend_bra_store_math_result:
 @1: ldx random_seed
     ldy random_seed+1
     bra @return_result
-.endproc
-
-.proc getrandom_range
 .endproc
 
 .rodata
