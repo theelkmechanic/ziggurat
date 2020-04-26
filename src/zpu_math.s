@@ -5,6 +5,7 @@ do_check_flag = $400
 do_arith_shift_flag = $400
 want_remainder = $400
 muldiv_sign = $401
+remainder_sign = $402
 
 .code
 
@@ -289,31 +290,37 @@ store_math_var:
     stx gREG::r6H
     jsr printf
 
+@dividend = operand_0
+@divisor = operand_1
+@remainder = operand_2
+@quotient = operand_0 ; reuse the dividend so we don't have to shift both
+
     ; Figure out result sign and negate operands if we need to
     jsr init_muldiv_sign
 
-    ; Clear the remainder in r3
-    stz operand_3
-    stz operand_3+1
+    ; Clear the remainder
+    stz @remainder
+    stz @remainder+1
 
-    ; Loop through all 16 bits, setting bits from r0 into the remainder, and then shifting them
-    ; into the quotient when we can subtract r1 from the remainder
+    ; Loop through all 16 bits, setting bits from dividend into the remainder, and then shifting them
+    ; into the result when we can subtract r1 from the remainder
     ldx #16
-@1: asl operand_0+1
-    rol operand_0
-    rol operand_3+1
-    rol operand_3
+@1: asl @dividend+1
+    rol @dividend
+    rol @remainder+1
+    rol @remainder
+    lda @remainder+1
     sec
-    lda operand_3+1
-    sbc operand_1+1
+    sbc @divisor+1
     tay
-    lda operand_3
-    sbc operand_1
+    lda @remainder
+    sbc @divisor
     bcc @2
-    sta operand_3
-    sty operand_3+1
-    rol operand_2+1
-    rol operand_2
+    sta @remainder
+    sty @remainder+1
+    inc @dividend+1
+    bne @2
+    inc @dividend
 @2: dex
     bne @1
 
@@ -322,14 +329,16 @@ store_math_var:
     bmi @store_remainder
 
     ; Move quotient into x/y and store it
-    ldx operand_2
-    ldy operand_2+1
+    ldx @quotient
+    ldy @quotient+1
     bra @check_sign_and_store_math_result
 
 @store_remainder:
     ; Move remainder into x/y and store it
-    ldx operand_3
-    ldy operand_3+1
+    ldx @remainder
+    ldy @remainder+1
+    lda remainder_sign
+    sta muldiv_sign
 
 @check_sign_and_store_math_result:
     bit muldiv_sign
@@ -430,10 +439,11 @@ extend_bra_store_math_result:
     ldx #0
     bit operand_0
     bpl @1
-    inx
+    dex
+    stx remainder_sign
 @1: bit operand_1
     bpl @2
-    inx
+    dex
 @2: txa
     lsr
     ror
