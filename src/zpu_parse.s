@@ -356,6 +356,10 @@ op_input_stream:
     ldx operand_0
     ldy operand_0+1
     jsr decode_baddr
+    sty zpu_mem
+    stx zpu_mem+1
+    sta zpu_mem+2
+    sta VIA1::PRA
     lda #1
     jsr mem_advance
     lda chars_typed
