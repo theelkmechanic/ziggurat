@@ -241,8 +241,8 @@
 .global current_window
 .global zm_windows
 
-.define SHOW_DEBUG_WINDOW 1
-.define SCREEN_HEIGHT 20
+.define SHOW_DEBUG_WINDOW 0
+.define SCREEN_HEIGHT 30
 .define SCREEN_WIDTH 80
 .define FONT_WIDTH 4
 .define FONT_HEIGHT 8

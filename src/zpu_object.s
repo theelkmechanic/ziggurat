@@ -491,12 +491,14 @@ set_or_clear = $400
     bra @scan_properties
 
 @found:
-    ; Step to the next property
+    ; Step to the next Property
     jsr find_next_property
 
 @get_prop_num:
     ; Get the property number
     jsr get_property_number
+    tay
+    ldx #0
     bra get_prop_store_result
 .endproc
 
