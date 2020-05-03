@@ -431,6 +431,7 @@ set_or_clear = $400
     sta zpu_mem+2
     sta VIA1::PRA
     lda operand_1+1
+    dec
     asl
     jsr mem_advance
     jsr mem_fetch_and_advance
