@@ -479,7 +479,7 @@ set_or_clear = $400
 
     ; If they're looking for prop #0, that means just get the first property
     lda operand_1+1
-    beq reverse_zpu_mem
+    beq @get_prop_num
 
 @scan_properties:
     ; Step through the list until we find a matching property
@@ -494,17 +494,11 @@ set_or_clear = $400
     ; Step to the next property
     jsr find_next_property
 
-    ; FALL THRU INTENTIONAL
+@get_prop_num:
+    ; Get the property number
+    jsr get_property_number
+    bra get_prop_store_result
 .endproc
-
-reverse_zpu_mem:
-    ; Reverse the current contents of zpu_mem into a byte address in x/y
-    ldy zpu_mem
-    ldx zpu_mem+1
-    lda zpu_mem+2
-    jsr encode_baddr
-
-    ; FALL THRU INTENTIONAL
 
 get_prop_store_result:
     ; Store the result and keep on truckin'
@@ -528,31 +522,6 @@ prop_not_found:
     lda #ERR_INVALID_PROPERTY
     jmp print_error_and_exit
 
-.proc op_get_prop_len
-    lda #<msg_op_get_prop_len
-    sta gREG::r6L
-    lda #>msg_op_get_prop_len
-    sta gREG::r6H
-    jsr printf
-
-    ; Find the base address of our object
-    ldx operand_0
-    ldy operand_0+1
-    jsr find_object
-    pushb zpu_mem+2
-
-    ; Now find the property in that object
-    jsr find_property
-    bcs @return_length
-    lda #ERR_INVALID_PROPERTY
-    jmp print_error_and_exit
-
-@return_length:
-    tay
-    ldx #0
-    bra get_prop_store_result
-.endproc
-
 .proc op_get_prop_addr
     lda #<msg_op_get_prop_addr
     sta gREG::r6L
@@ -566,23 +535,55 @@ prop_not_found:
     jsr find_object
     pushb zpu_mem+2
 
-    ; Get the property list address
-    jsr find_property_list
-
-@scanprop:
-    ; Get the property number and see if it matches (Note: Properties are required to be listed in descending order, so
-    ; once we hit a property that is less than the one we're looking for, we can bottom out the search)
-    jsr get_property_number
-    cmp operand_1+1
-    beq reverse_zpu_mem
+    ; Now find the property in that object
+    jsr find_property
     bcc @not_found
-    jsr find_next_property
-    bra @scanprop
 
-    ; Return 0 if property not found
+    ; Turn zpu_mem back into a byte address
+    ldy zpu_mem
+    ldx zpu_mem+1
+    lda zpu_mem+2
+    jsr encode_baddr
+    bra get_prop_store_result
+
 @not_found:
+    ; Return 0 if property not found
     ldx #0
     ldy #0
+    bra get_prop_store_result
+.endproc
+
+.proc op_get_prop_len
+    lda #<msg_op_get_prop_len
+    sta gREG::r6L
+    lda #>msg_op_get_prop_len
+    sta gREG::r6H
+    jsr printf
+
+    ; Operand_0 is the address of the property data. Given that, step back to find the length.
+    ldx operand_0
+    ldy operand_0+1
+    jsr decode_baddr
+    sty zpu_mem
+    stx zpu_mem+1
+    sta zpu_mem+2
+    pushb zpu_mem+2
+
+    ; V1-3 prop num/length is always 1 byte. V4+ is 1 byte if high bit is clear and 2 bytes if high bits are set.
+    ldx #1
+    chkver V4|V5|V6|V7|V8,@backup_x_and_get_length
+    lda #1
+    jsr mem_retreat
+    lda (zpu_mem)
+    and #$80
+    beq @get_length
+@backup_x_and_get_length:
+    txa
+    jsr mem_retreat
+@get_length:
+    jsr get_property_length
+    tay
+    ldx #0
     jmp get_prop_store_result
 .endproc
 
@@ -1050,7 +1051,7 @@ msg_op_insert_obj: .byte "Insert object @ into object @", CH::ENTER, 0
 msg_op_remove_obj: .byte "Remove object @ from parent", CH::ENTER, 0
 msg_op_get_prop: .byte "Get object @ prop @", CH::ENTER, 0
 msg_op_get_next_prop: .byte "Get next prop for object @ prop @", CH::ENTER, 0
-msg_op_get_prop_len: .byte "Get length of object @ prop @", CH::ENTER, 0
+msg_op_get_prop_len: .byte "Get length of prop at @", CH::ENTER, 0
 msg_op_get_prop_addr: .byte "Get address of object @ prop @", CH::ENTER, 0
 msg_op_put_prop: .byte "Put object @ prop @ value=@", CH::ENTER, 0
 msg_op_get_parent: .byte "Getting object @'s parent", CH::ENTER, 0
