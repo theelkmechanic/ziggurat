@@ -174,28 +174,11 @@ set_or_clear = $400
     sta gREG::r6H
     jsr printf
 
-    ; Find the base address of the destination object
-    ldx operand_1
-    ldy operand_1+1
-    jsr find_object
-    pushb zpu_mem+2
-
-    ; Get the destination's current child (so it can be our new child's sibling)
-    jsr get_child
-    stx operand_2
-    sty operand_2+1
-
-    ; And set our object as the new child of the destination
-    ldx operand_0
-    ldy operand_0+1
-    jsr set_child
-
     ; Get the test object
     ldx operand_0
     ldy operand_0+1
     jsr find_object
-    lda zpu_mem+2
-    sta VIA1::PRA
+    pushb zpu_mem+2
 
     ; Get its parent
     jsr get_parent
