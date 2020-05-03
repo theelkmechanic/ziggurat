@@ -21,8 +21,8 @@ skip_unknown = $441
 parse_char = $442
 num_seps = $443
 word_dict = $44c
-word_pos = $44e
-word_len = $44f
+word_len = $44e
+word_pos = $44f
 word_buf = $500
 
 encoded_buf = $600
@@ -511,7 +511,6 @@ op_input_stream:
 @notaspace:
     ; Save the start of this word
     lda text_idx
-    dec
     sta word_pos
     ldx #0
     lda parse_char
