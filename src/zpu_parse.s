@@ -55,6 +55,11 @@ op_input_stream:
     sta gREG::r6H
     jsr printf
 
+    ; Flush the current buffer and reset the scroll count
+    lda current_window
+    jsr win_flushbuffer
+    jsr win_resetscrlcnt
+
     ; Read a key from the keyboard
     jsr read_char
 
