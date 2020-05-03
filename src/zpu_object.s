@@ -139,13 +139,15 @@ set_or_clear = $400
     clc ; Push to stack if necessary
     jsr store_varvalue
 
-    ; Branch if exists (easiest is to invert and branch if 0)
-    txa
-    eor #$ff
-    sta operand_0
-    tya
-    eor #$ff
-    sta operand_0+1
+    ; Branch if exists (simplest to use jz, so flip zero <=> non-zero)
+    stz operand_0
+    stz operand_0+1
+    cpx #0
+    bne @exists
+    cpy #0
+    bne @exists
+    inc operand_0+1
+@exists:
     jmp do_jz
 .endproc
 
