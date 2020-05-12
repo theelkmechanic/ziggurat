@@ -19,6 +19,7 @@
 .global win_setfont
 .global win_putchr
 .global win_scroll
+.global win_scrolldown
 .global win_getscrlcnt
 .global win_resetscrlcnt
 

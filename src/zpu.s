@@ -310,11 +310,6 @@ zm_windows: .res 8
     sta utf_xlat_addr+2
 
 @init_windows:
-    ; Initialize our windowing library
-    lda #1
-    sta VIA1::PRA
-    jsr win_init
-
     ; Open our windows (main, status, and debug)
     ldx #7
     lda #$ff

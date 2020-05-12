@@ -160,7 +160,7 @@ buf_off = $720
     jsr win_getptr
 
     ; Skip to left/top and load
-    lda #Window::left
+    ldy #Window::left
     bra win_get_word_to_xy
 .endproc
 

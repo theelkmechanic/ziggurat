@@ -2,23 +2,22 @@
 
 .include "ziggurat.inc"
 
-.export load_zif
+.export load_file_to_hiram
 
-.import printhex
 .import print_error_and_exit
 
 .code
 
 ;
-; loadzif - Load a ZIF file into high memory pages
+; load_file_to_hiram - Load a file into high memory pages
 ;
-; In: r0 Pointer to filename
-; a Filename length
-; x Device #
-; Out: a Length of ZIF data loaded in 8K banks (0=failure)
+; In:   r0          Pointer to filename
+;       a           Filename length
+;       x           Device #
+; Out:  a           Length of ZIF data loaded in 8K banks (0=failure)
 ;
 
-.proc load_zif
+.proc load_file_to_hiram
     ; Setup file load channel
     pha
     lda #1
@@ -114,8 +113,6 @@ copyblock:
     bne nextblock
     ldx #$a0
     inc bank
-    lda #'.'
-    jsr CHROUT
 nextblock:
     stx baseaddr+1
 
@@ -139,7 +136,5 @@ done:
     jsr CLRCHN
     lda #1
     jsr CLOSE
-    lda #CH::ENTER
-    jsr CHROUT
     rts
 .endproc
