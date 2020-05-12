@@ -4,9 +4,9 @@
 
 .bss
 
+utf16: .res 2
 utf_xlat_addr: .res 3
 
-utf16 = $7d0
 map_base = gREG::r9
 map_entry = gREG::r10
 
@@ -540,7 +540,7 @@ utf_latin_1_supplement:
     .byte $80, $19, $e4
 
 utf_latin_extended_a:
-    .word 256, 128, 0
+    .word 256, 128, utf_block_elements
     .byte $80, $41, $c9
     .byte $80, $01, $e9
     .byte $80, $41, $c8
@@ -669,3 +669,38 @@ utf_latin_extended_a:
     .byte $80, $5a, $c8
     .byte $80, $1a, $e8
     .byte $00, $ff, $00
+
+utf_block_elements:
+    .word $2580, 32, 0
+    .byte $80, $20, $07
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $a0, $20, $07
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $40, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $06
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $a0, $20, $06
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $00
+    .byte $80, $20, $03
+    .byte $80, $20, $04
+    .byte $80, $20, $01
+    .byte $a0, $20, $02
+    .byte $80, $20, $05
+    .byte $a0, $20, $04
+    .byte $a0, $20, $03
+    .byte $80, $20, $02
+    .byte $a0, $20, $05
+    .byte $a0, $20, $01

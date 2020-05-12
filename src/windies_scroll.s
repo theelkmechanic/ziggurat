@@ -2,6 +2,12 @@
 .include "cbm_kernal.inc"
 .include "windies_impl.inc"
 
+.bss
+
+lines: .res 1
+cols: .res 1
+curr_line: .res 1
+
 .code
 
 ; win_scroll - Scroll a window's contents up one line
@@ -24,29 +30,25 @@
 ; curwin_scroll - Scroll the current window's contents up one line
 ; In:   win_ptr     - Pointer to window table entry
 .proc curwin_scroll
-@lines = $740
-@cols = $741
-@curr_line = $742
-
     ; The number of rows to scroll is the heigth of the window minus 1
     ldy #Window::height
     lda (win_ptr),y
     dec
-    sta @lines
+    sta lines
 
     ; The number of columns to copy in each line is the width * 2 (need to copy color bytes as well)
     dey
     lda (win_ptr),y
     asl
-    sta @cols
+    sta cols
 
     ; Now copy lines up
-    stz @curr_line
+    stz curr_line
 
 @scroll_loop:
     ; Calculate the address of the current line in the window
     ldx #0
-    ldy @curr_line
+    ldy curr_line
     jsr curwin_calcaddr
 
     ; Set destination to current line
@@ -62,7 +64,7 @@
     sty blt_src
 
     ; Length is number of columns
-    lda @cols
+    lda cols
     sta blt_len
     stz blt_len+1
 
@@ -76,16 +78,16 @@
     lda blt_dst+1
     ora #$20
     sta blt_dst+1
-    lda @cols
+    lda cols
     sta blt_len
     stz blt_len+1
     jsr vera_blt
 
     ; Skip to next line
-    lda @curr_line
+    lda curr_line
     inc
-    cmp @lines
-    sta @curr_line
+    cmp lines
+    sta curr_line
     bne @scroll_loop
 
     ; And clear the last line
@@ -102,7 +104,7 @@
     beq @scroll_done
     ldy #Window::scrlcnt
     lda (win_ptr),y
-    cmp @lines
+    cmp lines
     bcs @more
 @scroll_done:
     rts
@@ -133,7 +135,7 @@
     sta (win_ptr),y
     ldy #Window::scrlcnt
     sta (win_ptr),y
-    ldy @curr_line
+    ldy curr_line
     jmp curwin_clearline
 .endproc
 
@@ -157,30 +159,23 @@
 ; curwin_scrolldown - Scroll the current window's contents down one line
 ; In:   win_ptr     - Pointer to window table entry
 .proc curwin_scrolldown
-@lines = $740
-@cols = $741
-@curr_line = $742
-
     ; The number of columns to copy in each line is the width * 2 (need to copy color bytes as well)
     ldy #Window::width
     lda (win_ptr),y
     asl
-    sta @cols
+    sta cols
 
-    ; The number of rows to scroll is the heigth of the window minus 1
+    ; Start row to scroll is the heigth of the window minus 2
     iny
     lda (win_ptr),y
     dec
-    sta @lines
-
-    ; Now copy lines down
     dec
-    sta @curr_line
+    sta curr_line
 
 @scroll_loop:
     ; Calculate the address of the current line in the window
     ldx #0
-    ldy @curr_line
+    ldy curr_line
     jsr curwin_calcaddr
 
     ; Set source to current line
@@ -196,7 +191,7 @@
     sty blt_dst
 
     ; Length is number of columns
-    lda @cols
+    lda cols
     sta blt_len
     stz blt_len+1
 
@@ -210,14 +205,14 @@
     lda blt_dst+1
     ora #$20
     sta blt_dst+1
-    lda @cols
+    lda cols
     sta blt_len
     stz blt_len+1
     jsr vera_blt
 
     ; Skip to next line
-    lda @curr_line
-    dec @curr_line
+    lda curr_line
+    dec curr_line
     bpl @scroll_loop
 
     ; And clear the first line

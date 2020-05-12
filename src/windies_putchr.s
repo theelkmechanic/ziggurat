@@ -2,31 +2,33 @@
 .include "cbm_kernal.inc"
 .include "windies_impl.inc"
 
+.bss
+
+putch_utf16: .res 2
+putch_flags: .res 1 ; $80 = advance after print, $40 = no buffering
+
+newline_winheight: .res 1
+
+bufferchar_chlo: .res 1
+bufferchar_chhi: .res 1
+bufferchar_font: .res 1
+bufferchar_colors: .res 1
+bufferchar_offsetx4: .res 2
+
+drawchar_chlo: .res 1
+drawchar_chhi: .res 1
+drawchar_font: .res 1
+drawchar_colors: .res 1
+drawchar_line: .res 1
+drawchar_column: .res 1
+
+drawchar_normal: .res 1
+drawchar_extra: .res 1
+drawchar_colors_extra: .res 1
+drawchar_colors_reverse: .res 1
+drawchar_color_flags: .res 1
+
 .code
-
-putch_utf16 = $780
-putch_flags = $782  ; $80 = advance after print, $40 = no buffering
-
-newline_winheight = $784
-
-bufferchar_chlo = $788
-bufferchar_chhi = $789
-bufferchar_font = $78a
-bufferchar_colors = $78b
-bufferchar_offsetx4 = $78c
-
-drawchar_chlo = $790
-drawchar_chhi = $791
-drawchar_font = $792
-drawchar_colors = $793
-drawchar_line = $794
-drawchar_column = $795
-
-drawchar_normal = $790
-drawchar_extra = $791
-drawchar_colors_extra = $796
-drawchar_colors_reverse = $797
-drawchar_color_flags = $798
 
 ; curwin_putchr_nobuffer - Write a Unicode character to the current window, flush and bypass buffer if enabled
 ; In:   x/y         - UTF-16 character to write (x=hi, y=lo)

@@ -17,6 +17,7 @@ fncount = $400
 fnlist = $414
 fntoplineidx = $404
 curline = $405
+chunklen = $800
 
 .segment "LOWCODE"
     ; Initialize our windowing library
@@ -38,6 +39,7 @@ curline = $405
     jsr win_setsize
     ldx #(COLOR::WHITE << 4) + COLOR::GRAY1
     jsr win_setcolor
+    jsr win_clear
     jsr show_title
 
     ; Show "Loading directory" message
@@ -66,7 +68,7 @@ curline = $405
     ; Open the file picker window
     jsr win_open
     sta filewin
-    ldx #30
+    ldx #56
     ldy #10
     jsr win_setpos
     ldx #0
@@ -132,15 +134,70 @@ curline = $405
     jmp zpu_start
 
 .proc show_title
+    ; Use zpu_mem because it's easier to scan with
+    lda #<zigtitle
+    sta zpu_mem
+    lda #>zigtitle
+    sta zpu_mem+1
+    lda #1
+    sta zpu_mem+2
+
+@draw_chunk:
+    ; Read start x/y and move cursor
+    jsr mem_fetch_and_advance
+    cmp #$ff
+    bne @goodchunk
+
+    ; Draw title texts
     lda titlewin
-    jsr win_clear
-    ldx #1
-    ldy #1
+    ldx #23
+    ldy #16
     jsr win_setcursor
-    ldx #>zigtitle
-    ldy #<zigtitle
+    ldx #>azmachine
+    ldy #<azmachine
     jsr printxy
-    rts
+    ldx #23
+    ldy #17
+    jsr win_setcursor
+    ldx #>forthex16
+    ldy #<forthex16
+    jsr printxy
+    ldx #1
+    ldy #28
+    jsr win_setcursor
+    ldx #>versionstr
+    ldy #<versionstr
+    jmp printxy
+
+@goodchunk:
+    ; Draw a chunk of graphics
+    tax
+    jsr mem_fetch_and_advance
+    tay
+    lda titlewin
+    jsr win_setcursor
+
+    ; Read length
+    jsr mem_fetch_and_advance
+    sta chunklen
+
+    ; Draw block characters
+@draw_next:
+    jsr mem_fetch_and_advance
+    tax
+    lda zigbits,x
+    tay
+    bpl @notblock
+    ldx #$25
+    .byte $2c
+@notblock:
+    ldx #0
+    lda titlewin
+    sec
+    jsr win_putchr
+    dec chunklen
+    bne @draw_next
+    bra @draw_chunk
 .endproc
 
 .proc update_yline
@@ -229,9 +286,8 @@ curline = $405
     ldx #0
     ldy #0
     jsr win_setcursor
-    ldy #10
-    sty fntoplineidx
-    sty curline
+    stz fntoplineidx
+    stz curline
     ldy #15
 @1: jsr update_yline
     dey
@@ -446,13 +502,12 @@ curline = $405
     clc
     adc #15
     sta loadwinwidth
-    lda #80
+    lda #76
     sec
     sbc loadwinwidth
-    lsr
     tax
     lda filewin
-    ldy #24
+    ldy #25
     jsr win_setpos
     ldx #0
     ldy #0
@@ -496,6 +551,15 @@ curline = $405
     ; Skip program address
     lda #2
     jsr mem_advance
+
+@check_count:
+    ; Bail at 250 files since we don't have room for more
+    lda fncount
+    cmp #250
+    bcc @check_line
+@done:
+    ; Finished parsing directory
+    rts
 
 @check_line:
     ; Check if this is a line
@@ -559,19 +623,69 @@ curline = $405
     ; Find the end of the line
     jsr mem_fetch_and_advance
     bne @skip_line
-    bra @check_line
-
-@done:
-    ; Finished parsing directory
-    rts
+    bra @check_count
 .endproc
 
 .rodata
 
-zigtitle:   .byte $5a, $69, $67, $67, $75, $72, $61, $74, 0
+versionstr: .byte $56, $65, $72, $73, $69, $6f, $6e, $20
+version:    .byte "0.0.2"
+            .byte 0
+
+azmachine:  .byte $41, $20, $5a, "-", $6d, $61, $63, $68, $69, $6e, $65, 0
+forthex16:  .byte $66, $6f, $72, $20, $74, $68, $65, $20, $58, "-16!", 0
 loading:    .byte $4c, $6f, $61, $64, $69, $6e, $67, $20, 0
 directory:  .byte $64, $69, $72, $65, $63, $74, $6f, $72, $79, 0
 threedots:  .byte "...", 0
 dollar:     .byte "$"
-choose:     .byte $43, $68, $6f, $6f, $73, $65, $20, $47, $61, $6d, $65, $3a, 0
-zork1:      .byte "zork1.dat", 0
+choose:     .byte $43, $68, $6f, $6f, $73, $65, $20, $67, $61, $6d, $65, $20, $66, $69, $6c, $65, $3a, 0
+
+zigbits:    .byte $20, $97, $96, $84, $9d, $90, $9e, $9f, $98, $9a, $8c, $99, $80, $9c, $9b, $88
+
+zigtitle:   .byte 72, 0, 5, 1, 3, 3, 3, 3
+            .byte 48, 1, 6, 1, 3, 3, 3, 3, 2
+            .byte 59, 1, 2, 5, 11
+            .byte 64, 1, 15, 1, 15, 12, 12, 12, 12, 12, 12, 12, 15, 14, 0, 15, 3, 2
+            .byte 13, 2, 6, 3, 3, 3, 3, 3, 3
+            .byte 27, 2, 2, 3, 3
+            .byte 34, 2, 45, 3, 3, 3, 3, 2, 0, 1, 3, 3, 7, 15, 14, 12, 15, 15, 8, 0, 0, 4, 12, 15, 3, 0, 0, 1, 15, 13, 15, 2, 0, 5, 15, 0, 3, 0, 1, 3, 7, 15, 15, 10, 1, 15, 15, 10
+            .byte 2, 3, 76, 3, 3, 3, 3, 7, 15, 15, 12, 12, 12, 12, 12, 12, 12, 12, 13, 15, 15, 14, 12, 15, 2, 0, 7, 14, 12, 12, 15, 11, 2, 0, 7, 14, 0, 0, 4, 13, 3, 7, 10, 0, 15, 15, 10, 0, 15, 15, 8, 0, 3, 0, 0, 5, 15, 2, 0, 7, 8, 0, 13, 15, 2, 0, 12, 15, 15, 0, 5, 15, 15, 15, 15, 11, 5, 15, 15
+            .byte 1, 4, 77, 5, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 15, 10, 0, 15, 15, 15, 14, 0, 0, 0, 0, 13, 15, 7, 14, 0, 0, 0, 0, 1, 15, 15, 10, 0, 15, 15, 10, 0, 15, 15, 0, 5, 15, 15, 0, 0, 15, 15, 7, 14, 5, 11, 4, 15, 15, 0, 0, 12, 15, 0, 5, 15, 15, 0, 1, 15, 13, 15, 15
+            .byte 1, 5, 78, 5, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 15, 15, 10, 0, 15, 15, 15, 0, 0, 1, 2, 1, 15, 15, 15, 8, 0, 1, 15, 3, 15, 15, 15, 10, 0, 15, 15, 10, 0, 15, 15, 0, 4, 12, 8, 0, 7, 15, 15, 15, 8, 12, 12, 8, 4, 15, 11, 0, 0, 15, 0, 5, 15, 15, 0, 5, 11, 1, 15, 15, 10
+            .byte 1, 6, 77, 5, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 15, 13, 10, 0, 15, 15, 10, 0, 1, 15, 15, 15, 15, 15, 15, 0, 0, 15, 15, 12, 12, 15, 15, 10, 0, 4, 12, 0, 0, 15, 15, 0, 0, 0, 0, 4, 15, 15, 15, 10, 1, 3, 15, 3, 0, 13, 15, 11, 0, 13, 3, 7, 15, 15, 0, 0, 12, 15, 14, 12
+            .byte 1, 7, 71, 5, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 15, 14, 5, 10, 0, 15, 15, 10, 0, 4, 15, 11, 0, 0, 15, 15, 0, 0, 4, 12, 8, 0, 15, 15, 11, 0, 0, 0, 0, 5, 15, 15, 0, 5, 15, 15, 0, 5, 15, 15, 3, 7, 15, 15, 15, 15, 15, 15, 15, 8, 0, 4, 12, 12, 8
+            .byte 1, 8, 64, 5, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 15, 15, 0, 5, 10, 0, 15, 15, 10, 0, 0, 4, 12, 0, 1, 15, 15, 2, 0, 0, 0, 0, 5, 15, 15, 15, 3, 0, 0, 3, 15, 15, 15, 3, 7, 15, 15, 13, 15, 15, 15, 15, 14, 12, 12, 0, 0, 12, 8
+            .byte 1, 9, 56, 5, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 15, 10, 0, 5, 10, 0, 15, 15, 15, 0, 0, 0, 0, 0, 7, 15, 15, 15, 2, 0, 0, 3, 15, 15, 14, 0, 13, 15, 15, 15, 15, 12, 0, 5, 14, 12, 12, 0, 12, 12, 8
+            .byte 1, 10, 45, 4, 15, 3, 3, 3, 15, 15, 15, 10, 0, 0, 0, 0, 15, 15, 15, 0, 0, 5, 10, 0, 15, 15, 15, 11, 2, 0, 1, 7, 15, 15, 8, 4, 13, 15, 15, 15, 15, 12, 0, 0, 0, 0, 12, 12
+            .byte 3, 11, 35, 13, 15, 14, 12, 13, 15, 8, 0, 0, 0, 1, 15, 15, 10, 0, 0, 5, 11, 3, 15, 15, 10, 4, 13, 15, 15, 15, 12, 8, 0, 0, 0, 4, 12, 8
+            .byte 7, 12, 18, 7, 10, 0, 0, 0, 0, 15, 15, 15, 0, 0, 0, 0, 0, 15, 14, 12, 8
+            .byte 6, 13, 13, 5, 14, 0, 0, 0, 0, 7, 15, 15, 11, 3, 3, 2
+            .byte 5, 14, 15, 1, 15, 8, 0, 0, 0, 0, 15, 15, 12, 12, 8, 5, 11, 3
+            .byte 5, 15, 15, 7, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 15
+            .byte 4, 16, 16, 1, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 15
+            .byte 4, 17, 16, 15, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 15
+            .byte 3, 18, 17, 5, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 15
+            .byte 3, 19, 17, 15, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 15, 15
+            .byte 2, 20, 18, 7, 14, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 7, 15, 15, 15, 15, 15
+            .byte 1, 21, 17, 1, 15, 0, 0, 0, 3, 3, 3, 7, 15, 15, 15, 15, 15, 14, 12, 12
+            .byte 1, 22, 12, 5, 15, 3, 15, 15, 15, 15, 15, 15, 12, 12, 12
+            .byte 3, 23, 4, 15, 12, 12, 8
+            .byte 56, 10, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 11, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 12, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 13, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 14, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 15, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 16, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 17, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 18, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 20, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 21, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 22, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 23, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 56, 24, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 45, 25, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 45, 26, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte 45, 27, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            .byte $ff

@@ -5,8 +5,7 @@
 .bss
 
 win_buffers: .res 80*4*8
-
-buf_off = $720
+buf_off: .res 2
 
 .code
 
