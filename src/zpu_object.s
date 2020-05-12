@@ -371,9 +371,12 @@ set_or_clear = $400
     ; ourselves out of the list. If the previous sibling is null, we should still be on our old parent and
     ; can just set his child.
     lda operand_4
+    tax
     ora operand_4+1
     beq @set_sibling_as_child_of_parent
+    ldy operand_4+1
     jsr find_object
+    sta VIA1::PRA
     ldx operand_3
     ldy operand_3+1
     jmp set_sibling
