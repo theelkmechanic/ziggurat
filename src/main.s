@@ -200,17 +200,8 @@ chunklen = $800
     bra @draw_chunk
 .endproc
 
-.proc update_yline
-    ; Check if fntoplineidx + y < count
-    stz fnlen
+.proc find_fname_addr
     phy
-    tya
-    clc
-    adc fntoplineidx
-    cmp fncount
-    bcs @printloop
-
-    ; Okay, line should be a valid filename, so find it and print it
     sta gREG::r0L
     stz gREG::r0H
     asl gREG::r0L
@@ -224,6 +215,33 @@ chunklen = $800
     lda #>fnlist
     adc gREG::r0H
     sta gREG::r0H
+    ldy #1
+    lda (gREG::r0)
+    sta zpu_mem
+    lda (gREG::r0),y
+    sta zpu_mem+1
+    iny
+    lda (gREG::r0),y
+    sta zpu_mem+2
+    sta VIA1::PRA
+    iny
+    lda (gREG::r0),y
+    sta fnlen
+    ply
+    rts
+.endproc
+
+.proc update_yline
+    ; Check if fntoplineidx + y < count
+    phy
+    tya
+    clc
+    adc fntoplineidx
+    cmp fncount
+    bcs @done
+
+    ; Okay, line should be a valid filename, so find it and print it
+    jsr find_fname_addr
 
     ; Is this the current line
     lda filewin
@@ -241,18 +259,6 @@ chunklen = $800
     jsr win_putchr
 
     ; Print the filename followed by enough spaces to clear the remainder of the line
-    ldy #1
-    lda (gREG::r0)
-    sta zpu_mem
-    lda (gREG::r0),y
-    sta zpu_mem+1
-    iny
-    lda (gREG::r0),y
-    sta zpu_mem+2
-    sta VIA1::PRA
-    iny
-    lda (gREG::r0),y
-    sta fnlen
     stz gREG::r0
     ldx #0
     lda filewin
@@ -362,31 +368,7 @@ chunklen = $800
     lda fntoplineidx
     clc
     adc curline
-    sta gREG::r0L
-    stz gREG::r0H
-    asl gREG::r0L
-    rol gREG::r0H
-    asl gREG::r0L
-    rol gREG::r0H
-    lda #<fnlist
-    clc
-    adc gREG::r0L
-    sta gREG::r0L
-    lda #>fnlist
-    adc gREG::r0H
-    sta gREG::r0H
-    ldy #1
-    lda (gREG::r0)
-    sta zpu_mem
-    lda (gREG::r0),y
-    sta zpu_mem+1
-    iny
-    lda (gREG::r0),y
-    sta zpu_mem+2
-    sta VIA1::PRA
-    iny
-    lda (gREG::r0),y
-    sta fnlen
+    jsr find_fname_addr
     lda #>filename
     sta gREG::r0H
     lda #<filename
