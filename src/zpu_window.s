@@ -191,7 +191,7 @@
 .proc op_set_cursor
     jmp op_illegal
 
-    chkver V6|V7|V8,@nowindow
+    chkver V6,@nowindow
     ldy #<msg_op_set_cursor_v6
     ldx #>msg_op_set_cursor_v6
     bra @debug
@@ -206,7 +206,7 @@
 .endproc
 
 .proc opext_set_font
-    chkver V6|V7|V8,@nowindow
+    chkver V6,@nowindow
     ldy #<msg_opext_set_font_v6
     ldx #>msg_opext_set_font_v6
     bra @debug
@@ -376,7 +376,7 @@
 .proc op_set_colour
     jmp op_illegal
 
-    chkver V6|V7|V8,@nowindow
+    chkver V6,@nowindow
     ldy #<msg_op_set_colour_v6
     ldx #>msg_op_set_colour_v6
     bra @debug

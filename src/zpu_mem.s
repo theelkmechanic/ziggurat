@@ -759,18 +759,17 @@ mem2_advance_skip:
     jsr printf
 
     ; Check for version 6 behavior
-    chkver V1|V2|V3|V4|V5,@pull_v6
+    chkver V6,@normal_pull
+    lda #ERR_TODO
+    jmp print_error_and_exit
 
+@normal_pull:
     ; Pop the top value off the stack and store it in the variable
     jsr zpop_word
     lda operand_0+1
     sec ; Modify stack in place
     jsr store_varvalue
     jmp fetch_and_dispatch
-
-@pull_v6:
-    lda #ERR_TODO
-    jmp print_error_and_exit
 .endproc
 
 ; zpop_word - Pull a word off the Z-machine stack (big-endian)
