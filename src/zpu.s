@@ -833,7 +833,7 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
 
 @exit:
 ;    jsr GETIN
-;    cmp #13
+;    cmp #' '
 ;    bne @exit
     ply
     plx
