@@ -304,8 +304,8 @@ store_math_var:
 
 @store_remainder:
     ; Move remainder into x/y and store it
-    ldx operand_1
-    ldy operand_1+1
+    ldx operand_2
+    ldy operand_2+1
     lda remainder_sign
     sta muldiv_sign
 
