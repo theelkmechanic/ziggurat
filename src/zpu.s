@@ -46,12 +46,14 @@ window_status: .res 1
 window_debug: .res 1
 current_window: .res 1
 zm_windows: .res 8
+printf_use_chrout: .res 1
 
 .code
 
 .proc zpu_start
     ; Load header fields into our zeropage
     ; Map version to bitfield
+    stz printf_use_chrout
     lda #50
     sta line_counter
     lda #1
@@ -691,9 +693,20 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
 ; print_error_and_exit - Prints an error message and exits
 ;
 ; In:   a           - Error message number
-;       r0-r9       - Error parameters to print
+;       op0-op9     - Error parameters to print
 .proc print_error_and_exit
+    ; Reset the screen
+    pha
+    jsr CINT
+    lda #2
+    jsr SCREEN_SET_MODE
+    lda #3
+    jsr SCREEN_SET_CHARSET
+    dec printf_use_chrout
+    stz window_debug
+
     ; Get an offset into the error message table
+    pla
     asl
     tax
     lda error_msg_list,x
@@ -710,6 +723,32 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     jmp RESTORE_BASIC
 .endproc
 
+.proc printf_putchr
+    bit printf_use_chrout
+    bmi @use_chrout
+    sec
+    jmp win_putchr
+@use_chrout:
+    pha
+    tya
+    cpy #$41
+    bcc @1
+    cpy #$5b
+    bcc @2
+    cpy #$61
+    bcc @1
+    cpy #$7b
+    bcs @1
+    sec
+    sbc #$20
+    bra @1
+@2: clc
+    adc #$20
+@1: jsr CHROUT
+    pla
+    rts
+.endproc
+
 .proc printf
     ; Print the PC
     pha
@@ -723,67 +762,51 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     phy
     ldx #0
     ldy #'p'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #'c'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #'('
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy zpu_pc+2
     jsr printhex
     ldy #':'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy zpu_pc+1
     jsr printhex
     ldy zpu_pc
     jsr printhex
     ldy #')'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #' '
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #'b'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #'p'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #'('
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy zpu_bp+1
     jsr printhex
     ldy zpu_bp
     jsr printhex
     ldy #')'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #' '
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #'s'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #'p'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #'('
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy zpu_sp+1
     jsr printhex
     ldy zpu_sp
     jsr printhex
     ldy #')'
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ldy #' '
-    sec
-    jsr win_putchr
+    jsr printf_putchr
 
     ; Print the string in r6
     ldx #0
@@ -825,8 +848,7 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     tay
     ldx #0
     lda window_debug
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ply
     plx
     bra @1
@@ -891,8 +913,7 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     tay
     ldx #0
     lda window_debug
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ply
     iny
     bne @2
@@ -917,8 +938,7 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     tay
     ldx #0
     pla
-    sec
-    jsr win_putchr
+    jsr printf_putchr
     ply
     phy
     pha
@@ -929,7 +949,7 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     tay
     pla
     sec
-    jsr win_putchr
+    jsr printf_putchr
     ply
     plx
     rts
