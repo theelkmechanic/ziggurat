@@ -290,53 +290,22 @@ store_math_var:
     stx gREG::r6H
     jsr printf
 
-@dividend = operand_0
-@divisor = operand_1
-@remainder = operand_2
-@quotient = operand_0 ; reuse the dividend so we don't have to shift both
-
-    ; Figure out result sign and negate operands if we need to
-    jsr init_muldiv_sign
-
-    ; Clear the remainder
-    stz @remainder
-    stz @remainder+1
-
-    ; Loop through all 16 bits, setting bits from dividend into the remainder, and then shifting them
-    ; into the result when we can subtract r1 from the remainder
-    ldx #16
-@1: asl @dividend+1
-    rol @dividend
-    rol @remainder+1
-    rol @remainder
-    lda @remainder+1
-    sec
-    sbc @divisor+1
-    tay
-    lda @remainder
-    sbc @divisor
-    bcc @2
-    sta @remainder
-    sty @remainder+1
-    inc @dividend+1
-    bne @2
-    inc @dividend
-@2: dex
-    bne @1
+    ; Do the actual division operation
+    jsr do_division
 
     ; Now which result do we want
     bit want_remainder
     bmi @store_remainder
 
     ; Move quotient into x/y and store it
-    ldx @quotient
-    ldy @quotient+1
+    ldx operand_0
+    ldy operand_0+1
     bra @check_sign_and_store_math_result
 
 @store_remainder:
     ; Move remainder into x/y and store it
-    ldx @remainder
-    ldy @remainder+1
+    ldx operand_1
+    ldy operand_1+1
     lda remainder_sign
     sta muldiv_sign
 
@@ -378,7 +347,7 @@ extend_bra_store_math_result:
     ; Put it in x/y and store it
     ldx operand_0
     ldy operand_0+1
-    bra extend_bra_store_math_result
+    bra store_math_result
 
 @do_right_shift:
     ; Do right shift -- first step is to invert the shift value
@@ -468,6 +437,43 @@ extend_bra_store_math_result:
 @4: rts
 .endproc
 
+.proc do_division
+@dividend = operand_0
+@divisor = operand_1
+@remainder = operand_2
+@quotient = operand_0 ; reuse the dividend so we don't have to shift both
+
+    ; Figure out result sign and negate operands if we need to
+    jsr init_muldiv_sign
+
+    ; Clear the remainder
+    stz @remainder
+    stz @remainder+1
+
+    ; Loop through all 16 bits, setting bits from dividend into the remainder, and then shifting them
+    ; into the result when we can subtract r1 from the remainder
+    ldx #16
+@1: asl @dividend+1
+    rol @dividend
+    rol @remainder+1
+    rol @remainder
+    lda @remainder+1
+    sec
+    sbc @divisor+1
+    tay
+    lda @remainder
+    sbc @divisor
+    bcc @2
+    sta @remainder
+    sty @remainder+1
+    inc @dividend+1
+    bne @2
+    inc @dividend
+@2: dex
+    bne @1
+    rts
+.endproc
+
 .proc op_random
     ; If range is 0, seed with a random value
     ldy operand_0+1
@@ -513,12 +519,64 @@ extend_bra_store_math_result:
     bra @return_0
 
 @getrandom_range:
-    ; Generate our next random value in the range specified
-    inc random_seed+1
-    bne @1
-    inc random_seed
-@1: ldx random_seed
+    ; Xorshift LSFR (16-bit)
+    ; First xor with seed >> 7
+    ldx random_seed
     ldy random_seed+1
+    txa
+    asl
+    lda #0
+    rol
+    eor random_seed
+    sta random_seed
+    pha
+    tya
+    asl
+    txa
+    rol
+    eor random_seed+1
+    sta random_seed+1
+
+    ; Then xor with seed << 9
+    asl
+    eor random_seed
+    sta random_seed
+    tax
+
+    ; Then xor with seed >> 13
+    pla
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    eor random_seed+1
+    sta random_seed+1
+    tay
+
+    ; Finally we need to restrict the range, so take seed % range and add 1
+    lda operand_0
+    sta operand_1
+    pha
+    lda operand_0+1
+    sta operand_1+1
+    pha
+    stx operand_0
+    sty operand_0+1
+    jsr do_division
+    lda operand_2+1
+    clc
+    adc #1
+    tay
+    lda operand_2
+    adc #0
+    tax
+
+    ; And put back the initial range for the debug statement
+    pla
+    sta operand_0+1
+    pla
+    sta operand_0
     bra @return_result
 .endproc
 
@@ -540,6 +598,6 @@ msg_op_log_shift: .byte "Shift @ by @ into var @ (logical)", CH::ENTER, 0
 msg_op_art_shift: .byte "Shift @ by @ into var @ (arithmetic)", CH::ENTER, 0
 msg_op_random: .byte "Random range=@ value=@", CH::ENTER, 0
 
-.bss
+.data
 
-random_seed:    .res 2
+random_seed:    .byte $ac, $e1
