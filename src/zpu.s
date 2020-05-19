@@ -383,7 +383,7 @@ printf_use_chrout: .res 1
 @start_zmachine:
     ; Hey, just for shits and giggles, let's print all the Unicode characters we can, followed
     ; by all the Font 3 characters, just to see how fucked up we got things
-    jsr debugchrdump
+    ;jsr debugchrdump
 
     ; Start the Z-machine
     lda #<msg_launching
