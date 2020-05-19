@@ -10,16 +10,6 @@ buf_off: .res 2
 .code
 
 ; win_init - Initialize the window system
-;
-; This initializes the VERA to display in one of two modes:
-;   Text mode (default): 80x30x256 text, used for displaying text. Uses both layers so we can double the # of font chars.
-;       - Text mode, 1bpp, T256C=1
-;       - Map size = 128x32, tile size = 8x16
-;       - Layer 0 (extras) map is from $02000-03fff, line stride is 256, tile set is at $05000
-;       - Layer 1 (normal) map is from $00000-01fff, line stride is 256, tile set is at $04000
-;   Graphics mode: 640x200x16 bitmap, used for displaying graphics in V6 games that need it. (TODO)
-;       - Bitmap mode, 4bpp, TILEW=1,TILEH=0
-;       - Screen buffer is from $00000-$1f3ff
 .proc win_init
     ; Initialize the VERA
     jsr vera_init
@@ -186,20 +176,11 @@ buf_off: .res 2
 
     ; Skip to cursor x/y and load
     ldy #Window::cur_x
-    bra win_get_word_to_xy
+
+    ; FALL THRU INTENTIONAL
 .endproc
 
-; win_getfont - Get window font
-; In:   a           - Window ID (0-MAX_WINDOWS-1)
-; Out:  x           - Font (high byte)
-;       y           - Fond (low byte)
-win_getfont:
-    ; Get the window table entry pointer
-    jsr win_getptr
-
-    ; Skip to font and load
-    ldy #Window::font
-win_get_word_to_xy:
+.proc win_get_word_to_xy
     pha
     lda (win_ptr),y
     tax
@@ -208,6 +189,7 @@ win_get_word_to_xy:
     tay
     pla
     rts
+.endproc
 
 ; win_setbuffer - Clear window buffer flag
 ; In:   a           - Window ID (0-MAX_WINDOWS-1)
@@ -327,22 +309,11 @@ win_get_word_to_xy:
     pha
     phy
     lda #Window::cur_x
-    bra win_set_word_from_xy
+
+    ; FALL THRU INTENTIONAL
 .endproc
 
-; win_setfont - Set window font
-; In:   a           - Window ID (0-MAX_WINDOWS-1)
-;       x           - Font (high byte)
-;       y           - Font (low byte)
-win_setfont:
-    ; Get the window table entry pointer
-    jsr win_getptr
-
-    ; Skip to cursor x/y and store
-    pha
-    phy
-    lda #Window::font
-win_set_word_from_xy:
+.proc win_set_word_from_xy
     pha
     tya
     ply
@@ -354,6 +325,7 @@ win_set_word_from_xy:
     ply
     pla
     rts
+.endproc
 
 ; win_getcolor - Get window foreground/background colors
 ; In:   a           - Window ID (0-MAX_WINDOWS-1)

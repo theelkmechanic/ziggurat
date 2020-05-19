@@ -218,11 +218,51 @@
     stx gREG::r6H
     jsr printf
 
-    ; Set the current font
+    ; Look up the font of the current window
     lda current_window
-    ldx operand_0
-    ldy operand_0+1
-    jsr win_setfont
+    asl
+    tay
+    lda zm_window_fonts,y
+    tax
+    iny
+    lda zm_window_fonts,y
+    tay
+
+    ; Font 0 just returns the current font
+    lda operand_0
+    ora operand_0+1
+    beq @done
+
+    ; We only support fonts 1, 3, and 4.
+    lda operand_0
+    bne @bad_font
+    lda operand_0+1
+    cmp #1
+    beq @good_font
+    cmp #4
+    beq @good_font
+    cmp #3
+    beq @good_font
+@bad_font:
+    ldx #0
+    ldy #0
+    bra @done
+@good_font:
+    phx
+    lda current_window
+    asl
+    tax
+    stz zm_window_fonts,x
+    inx
+    lda operand_0+1
+    sta zm_window_fonts,x
+    plx
+
+@done:
+    ; Store the previous font in the result
+    jsr pc_fetch_and_advance
+    clc ; Push stack if necessary
+    jsr store_varvalue
     jmp fetch_and_dispatch
 .endproc
 
@@ -268,7 +308,7 @@
 .endproc
 
 .proc op_set_text_style
-    jmp op_illegal
+ ;   jmp op_illegal
 
     lda #<msg_op_set_text_style
     sta gREG::r6L
@@ -374,7 +414,7 @@
 .endproc
 
 .proc op_set_colour
-    jmp op_illegal
+;    jmp op_illegal
 
     chkver V6,@nowindow
     ldy #<msg_op_set_colour_v6

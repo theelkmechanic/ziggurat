@@ -37,7 +37,7 @@ chunklen = $800
     ldx #80
     ldy #30
     jsr win_setsize
-    ldx #(COLOR::WHITE << 4) + COLOR::GRAY1
+    ldx #(W_WHITE << 4) + W_DGREY
     jsr win_setcolor
     jsr win_clear
     jsr show_title
@@ -78,7 +78,7 @@ chunklen = $800
     ldx #20
     ldy #18
     jsr win_setsize
-    ldx #(COLOR::GRAY1 << 4) + COLOR::WHITE
+    ldx #(W_DGREY << 4) + W_WHITE
     jsr win_setcolor
     jsr win_clear
     jsr boxfilewin
@@ -245,8 +245,6 @@ chunklen = $800
 
     ; Is this the current line
     lda filewin
-    ldx #3
-    jsr win_setfont
     ldx #0
     jsr win_setcursor
     cpy curline
@@ -255,14 +253,13 @@ chunklen = $800
     .byte $2c
 @iscurrent:
     ldy #34
+    ldx #$e0
     sec
     jsr win_putchr
 
     ; Print the filename followed by enough spaces to clear the remainder of the line
     stz gREG::r0
     ldx #0
-    lda filewin
-    jsr win_setfont
 @printloop:
     lda gREG::r0
     cmp #16
@@ -401,9 +398,7 @@ chunklen = $800
     ldx #0
     ldy #0
     jsr win_setcursor
-    ldx #3
-    jsr win_setfont
-    ldx #0
+    ldx #$e0
     ldy #47
     sec
     jsr win_putchr
@@ -416,26 +411,30 @@ chunklen = $800
 @2: ldy #48
     sec
     jsr win_putchr
+    ldx #0
     ldy #13
     sec
     jsr win_putchr
 @3: dec gREG::r7L
     bmi @4
+    ldx #$e0
     ldy #41
     sec
     jsr win_putchr
     jsr win_getcursor
     ldx gREG::r7H
     jsr win_setcursor
-    ldx #0
+    ldx #$e0
     ldy #40
     sec
     jsr win_putchr
+    ldx #0
     ldy #13
     sec
     jsr win_putchr
     bra @3
-@4: ldy #46
+@4: ldx #$e0
+    ldy #46
     sec
     jsr win_putchr
     ldy #38
@@ -447,8 +446,6 @@ chunklen = $800
 @6: ldy #49
     sec
     jsr win_putchr
-    ldx #0
-    jsr win_setfont
     rts
 .endproc
 
@@ -498,7 +495,7 @@ chunklen = $800
     ldx loadwinwidth
     ldy #3
     jsr win_setsize
-    ldx #(COLOR::GRAY1 << 4) + COLOR::WHITE
+    ldx #(W_DGREY << 4) + W_WHITE
     jsr win_setcolor
     jsr win_clear
     jsr boxfilewin
@@ -620,7 +617,7 @@ loading:    .byte $4c, $6f, $61, $64, $69, $6e, $67, $20, 0
 directory:  .byte $64, $69, $72, $65, $63, $74, $6f, $72, $79, 0
 threedots:  .byte "...", 0
 dollar:     .byte "$"
-choose:     .byte $43, $68, $6f, $6f, $73, $65, $20, $67, $61, $6d, $65, $20, $66, $69, $6c, $65, $3a, 0
+choose:     .byte $43, $68, $6f, $6f, $73, $65, $20, $67, $61, $6d, $65, $3a, 0
 
 zigbits:    .byte $20, $97, $96, $84, $9d, $90, $9e, $9f, $98, $9a, $8c, $99, $80, $9c, $9b, $88
 

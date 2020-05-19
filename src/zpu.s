@@ -46,6 +46,7 @@ window_status: .res 1
 window_debug: .res 1
 current_window: .res 1
 zm_windows: .res 8
+zm_window_fonts: .res 8*2
 printf_use_chrout: .res 1
 
 .code
@@ -315,13 +316,25 @@ printf_use_chrout: .res 1
     ; Open our windows (main, status, and debug)
     ldx #7
     lda #$ff
-@clear_window_list:
+@clearwinlist:
     sta zm_windows,x
     dex
-    bne @clear_window_list
+    bpl @clearwinlist
+    sta window_status
+    sta window_debug
+    lda #0
+    tax
+@initwinfontlist:
+    sta zm_window_fonts,x
+    inx
+    sta zm_window_fonts,x
+    inc zm_window_fonts,x
+    inx
+    cpx #8*2
+    bne @initwinfontlist
     jsr win_open
     sta zm_windows
-    sta current_window
+    stz current_window
     ldx #SCREEN_WIDTH
     ldy #SCREEN_HEIGHT
     jsr win_setsize
@@ -337,13 +350,9 @@ printf_use_chrout: .res 1
     sta window_debug
     ldy #30-SCREEN_HEIGHT
     jsr win_setsize
-.else
-    ; No debug window
-    lda #$ff
-    sta window_debug
 .endif
     lda zm_windows
-    ldx #(COLOR::WHITE << 4) + COLOR::GRAY1
+    ldx #(W_BLACK << 4) + W_LGREY
     jsr win_setcolor
     ldx #1
     jsr win_setbuffer
@@ -356,7 +365,7 @@ printf_use_chrout: .res 1
     bmi @nodebugwindow
     iny
     jsr win_setpos
-    ldx #(COLOR::BLUE << 4) + COLOR::WHITE
+    ldx #(W_BLUE << 4) + W_WHITE
     jsr win_setcolor
     ldx #0
     jsr win_setbuffer
@@ -365,7 +374,7 @@ printf_use_chrout: .res 1
 @nodebugwindow:
     chkver V1|V2|V3,@start_zmachine
     lda window_status
-    ldx #(COLOR::GRAY1 << 4) + COLOR::WHITE
+    ldx #(W_LGREY << 4) + W_BLACK
     jsr win_setcolor
     ldx #0
     jsr win_setwrap
@@ -374,7 +383,7 @@ printf_use_chrout: .res 1
 @start_zmachine:
     ; Hey, just for shits and giggles, let's print all the Unicode characters we can, followed
     ; by all the Font 3 characters, just to see how fucked up we got things
-;    jsr debugchrdump
+    jsr debugchrdump
 
     ; Start the Z-machine
     lda #<msg_launching
@@ -1025,6 +1034,13 @@ dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
     iny
     cpy #128
     bne @loopc
+    ldx #$25
+@loopd:
+    sec
+    jsr win_putchr
+    iny
+    cpy #$a0
+    bne @loopd
     ldx #0
     ldy #$0d
     sec
@@ -1039,19 +1055,16 @@ dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
     jsr debugprtstr
 
     lda zm_windows
-    ldx #3
-    jsr win_setfont
-    ldx #0
+    ldx #$e0
     ldy #32
-@loopd:
+@loope:
     sec
     jsr win_putchr
     iny
     cpy #127
-    bne @loopd
+    bne @loope
 
     ldx #0
-    jsr win_setfont
     ldy #$0d
     sec
     jsr win_putchr

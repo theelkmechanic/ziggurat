@@ -11,22 +11,18 @@ newline_winheight: .res 1
 
 bufferchar_chlo: .res 1
 bufferchar_chhi: .res 1
-bufferchar_font: .res 1
 bufferchar_colors: .res 1
-bufferchar_offsetx4: .res 2
+bufferchar_offset: .res 1
 
 drawchar_chlo: .res 1
 drawchar_chhi: .res 1
-drawchar_font: .res 1
 drawchar_colors: .res 1
 drawchar_line: .res 1
 drawchar_column: .res 1
 
-drawchar_normal: .res 1
-drawchar_extra: .res 1
-drawchar_colors_extra: .res 1
-drawchar_colors_reverse: .res 1
-drawchar_color_flags: .res 1
+drawchar_base: .res 1
+drawchar_overlay: .res 1
+drawchar_flags: .res 1
 
 .code
 
@@ -161,14 +157,11 @@ drawchar_color_flags: .res 1
     jsr curwin_newline
 
 @printit:
-    ; Get the window colors and font
+    ; Get the window colors
     pha
     ldy #Window::colors
     lda (win_ptr),y
     tax
-    ldy #Window::font
-    lda (win_ptr),y
-    tay
     pla
 
     ; Now check to see if we should be buffering
@@ -183,18 +176,15 @@ drawchar_color_flags: .res 1
     lda putch_utf16+1
     sta bufferchar_chhi
     stx bufferchar_colors
-    sty bufferchar_font
     jsr bufferchar
 
     ; See if we're supposed to print the character
     bcs @done
     ldx bufferchar_colors
-    ldy bufferchar_font
 
 @actuallyprint:
     ; Print our character glyph on the screen at the correct location
     stx drawchar_colors
-    sty drawchar_font
     ldy #Window::top
     lda (win_ptr),y
     ldy #Window::cur_y
@@ -255,7 +245,6 @@ drawchar_color_flags: .res 1
 ; bufferchar - Handle character buffering in the current window
 ; In:   bufferchar_chlo     - UTF-16 character (low byte)
 ;       bufferchar_chhi     - UTF-16 character (high byte)
-;       bufferchar_font     - Font (3 = Z-machine Font 3, anything else = normal)
 ;       bufferchar_colors   - Text colors (foreground = low nibble, background = high nibble)
 ; Out:  carry               - Set if we buffered the character, clear means print and advance
 .proc bufferchar
@@ -334,33 +323,21 @@ drawchar_color_flags: .res 1
     bra @check_buffer_space
 
 @check_add_to_buffer:
-    ; Advance our pointer by the offset (which should be in a) * 4
-    stz bufferchar_offsetx4+1
+    ; Find the next empty space in the buffer (offset*3)
+    sta bufferchar_offset
     asl
-    rol bufferchar_offsetx4+1
-    asl
-    rol bufferchar_offsetx4+1
-    sta bufferchar_offsetx4
-    lda buf_ptr
     clc
-    adc bufferchar_offsetx4
-    sta buf_ptr
-    lda buf_ptr+1
-    adc bufferchar_offsetx4+1
-    sta buf_ptr+1
+    adc bufferchar_offset
+    tay
 
-@add_to_buffer:
     ; Save the character info in the buffer
-    ldy #1
     lda bufferchar_chlo
-    sta (buf_ptr)
+    sta (buf_ptr),y
+    iny
     lda bufferchar_chhi
     sta (buf_ptr),y
     iny
     lda bufferchar_colors
-    sta (buf_ptr),y
-    iny
-    lda bufferchar_font
     sta (buf_ptr),y
 
     ; And increment the buffer offset
@@ -385,7 +362,6 @@ drawchar_color_flags: .res 1
 
 ; curwin_flushbuffer - Print any text in the current window's buffer to the screen
 .proc curwin_flushbuffer
-@buf_off = $760 
 
     ; Make sure we're actually buffering
     pha
@@ -404,20 +380,20 @@ drawchar_color_flags: .res 1
     sta buf_ptr
     iny
     lda (win_ptr),y
-    sta @buf_off
+    sta bufferchar_offset
 
     ; And reset the buffer offset since we're going to empty it
     lda #0
     sta (win_ptr),y
 
     ; Now we need to loop through all the buffer characters and print them
+    ldy #0
 @flush_loop:
     ; See if we're done
-    dec @buf_off
+    dec bufferchar_offset
     bmi @done
 
     ; Print a character
-    ldy #0
     lda (buf_ptr),y
     sta drawchar_chlo
     iny
@@ -427,8 +403,7 @@ drawchar_color_flags: .res 1
     lda (buf_ptr),y
     sta drawchar_colors
     iny
-    lda (buf_ptr),y
-    sta drawchar_font
+    phy
     ldy #Window::top
     lda (win_ptr),y
     clc
@@ -446,15 +421,7 @@ drawchar_color_flags: .res 1
     lda (win_ptr),y
     inc
     sta (win_ptr),y
-
-    ; Step to next buffer entry (4 bytes)
-    lda buf_ptr
-    clc
-    adc #4
-    sta buf_ptr
-    lda buf_ptr+1
-    adc #0
-    sta buf_ptr+1
+    ply
     bra @flush_loop
 
 @done:
@@ -467,7 +434,6 @@ drawchar_color_flags: .res 1
 ; drawchar - Draw a character glyph onto the screen
 ; In:   drawchar_chlo       - UTF-16 character (low byte)
 ;       drawchar_chhi       - UTF-16 character (high byte)
-;       drawchar_font       - Font (3 = Z-machine Font 3, anything else = normal)
 ;       drawchar_colors     - Text colors (foreground = low nibble, background = high nibble)
 ;       drawchar_line       - Line to draw character
 ;       drawchar_column     - Column to draw character
@@ -484,14 +450,9 @@ drawchar_color_flags: .res 1
     bcs @done
 
     ; Find the fontmap entry for our character
-    lda drawchar_colors
-    sta drawchar_colors_extra
     ldy drawchar_chlo
     ldx drawchar_chhi
-    lda drawchar_font
     jsr utf_find_charinfo
-    stx drawchar_normal
-    sty drawchar_extra
     bcs @foundit
 
 @done:
@@ -502,54 +463,43 @@ drawchar_color_flags: .res 1
 
 @foundit:
     ; See if we need to reverse colors
-    sta drawchar_color_flags
-    lda #$20
-    bit drawchar_color_flags
-    bne @need_reverse
-    bvc @check_trans
-
-@need_reverse:
-    ; Swap the colors
-    php
-    lda drawchar_colors
-    asl
-    asl
-    asl
-    asl
-    sta drawchar_colors_reverse
-    lda drawchar_colors
-    lsr
-    lsr
-    lsr
-    lsr
-    ora drawchar_colors_reverse
-
-    ; Put swapped colors where we need them
-    plp
-    bvc @check_reverse_extras
-    sta drawchar_colors
-@check_reverse_extras:
+    stx drawchar_base
+    sty drawchar_overlay
+    sta drawchar_flags
+    bit #$80
     beq @draw_glyphs
-    sta drawchar_colors_extra
 
-@check_trans:
-    ; Is the layer 1 background supposed to be transparent?
-    bpl @draw_glyphs
-
-    ; If we reversed layer 1, set normal color foreground to transparent
+    ; Swap the colors
     lda drawchar_colors
-    bvc @trans_bg
-    and #$f0
-    bra @save_trans
-
-@trans_bg:
-    ; Otherwise set normal color background to transparent (0)
-    and #$0f
-@save_trans:
+    asl
+    asl
+    asl
+    asl
+    pha
+    lda drawchar_colors
+    lsr
+    lsr
+    lsr
+    lsr
+    sta drawchar_colors
+    pla
+    ora drawchar_colors
     sta drawchar_colors
 
 @draw_glyphs:
-    ; Set the location to write (normal page)
+    ; Put the foregroud color in the flags high nibble
+    lda drawchar_flags
+    and #$0f
+    sta drawchar_flags
+    lda drawchar_colors
+    asl
+    asl
+    asl
+    asl
+    ora drawchar_flags
+    sta drawchar_flags
+
+    ; Set the location to write (base page)
     lda drawchar_column
     asl
     tax
@@ -562,7 +512,7 @@ drawchar_color_flags: .res 1
     sty VERA::ADDR+1
     stx VERA::ADDR
 
-    ; Set the location to write (extras page)
+    ; Set the location to write (overlay page)
     lda VERA::CTRL
     ora #$01
     sta VERA::CTRL
@@ -575,19 +525,15 @@ drawchar_color_flags: .res 1
     stx VERA::ADDR
 
     ; Write the normal character glyph and color
-    lda drawchar_normal
+    lda drawchar_base
     sta VERA::DATA0
     lda drawchar_colors
     sta VERA::DATA0
 
     ; Write the extras character glyph and color
-    lda drawchar_extra
+    lda drawchar_overlay
     sta VERA::DATA1
-    beq @nobackcolor
-    lda drawchar_colors_extra
-    .byte $2c
-@nobackcolor:
-    lda #0
+    lda drawchar_flags
     sta VERA::DATA1
     clc
     jmp @done

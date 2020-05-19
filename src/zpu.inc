@@ -240,6 +240,7 @@
 .global window_status
 .global current_window
 .global zm_windows
+.global zm_window_fonts
 
 .define SHOW_DEBUG_WINDOW 0
 .define SCREEN_HEIGHT 30

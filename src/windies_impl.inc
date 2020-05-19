@@ -9,7 +9,6 @@
     height  .byte
     cur_x   .byte
     cur_y   .byte
-    font    .word   ; (big-endian)
     bufptr  .word   ; (big-endian)
     bufoff  .byte
     scrlcnt .byte
@@ -60,9 +59,3 @@ VERA_L1_VSCROLL_H = $9f3a
 .globalzp buf_ptr
 
 .global utf_find_charinfo
-
-CHINFO_L0_REV       = $20
-CHINFO_L1_REV       = $40
-CHINFO_L1_TRANS     = $80
-
-.global zmachine_default_font_8x16

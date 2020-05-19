@@ -15,8 +15,6 @@
 .global win_setcursor
 .global win_getcolor
 .global win_setcolor
-.global win_getfont
-.global win_setfont
 .global win_putchr
 .global win_scroll
 .global win_scrolldown
@@ -29,3 +27,15 @@
 WIN_ISOPEN = $80
 WIN_BUFFER = $40
 WIN_WRAP = $20
+
+W_BLACK     = 2
+W_RED       = 3
+W_GREEN     = 4
+W_YELLOW    = 5
+W_BLUE      = 6
+W_MAGENTA   = 7
+W_CYAN      = 8
+W_WHITE     = 9
+W_LGREY     = 10
+W_MGREY     = 11
+W_DGREY     = 12
