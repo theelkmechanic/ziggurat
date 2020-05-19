@@ -141,6 +141,12 @@ drawchar_flags: .res 1
     rts
 
 @printable:
+    ; See if we actually have glyphs for it
+    ldy putch_utf16
+    ldx putch_utf16+1
+    jsr utf_find_charinfo
+    bcc @done
+
     ; Don't print past the width of the window
     ldy #Window::cur_x
     lda (win_ptr),y

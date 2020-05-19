@@ -381,9 +381,7 @@ printf_use_chrout: .res 1
     jsr win_setbuffer
 
 @start_zmachine:
-    ; Hey, just for shits and giggles, let's print all the Unicode characters we can, followed
-    ; by all the Font 3 characters, just to see how fucked up we got things
-    ;jsr debugchrdump
+;    jsr debugchrdump
 
     ; Start the Z-machine
     lda #<msg_launching
@@ -1000,11 +998,11 @@ dbgstr_unicode: .byte "unicode:", CH::ENTER, 0
 dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
 
 .proc debugchrdump
-    lda #<dbgstr_testline
-    sta gREG::r6L
-    lda #>dbgstr_testline
-    sta gREG::r6H
-    jsr debugprtstr
+;    lda #<dbgstr_testline
+;    sta gREG::r6L
+;    lda #>dbgstr_testline
+;    sta gREG::r6H
+;    jsr debugprtstr
 
     lda #<dbgstr_unicode
     sta gREG::r6L
@@ -1034,13 +1032,22 @@ dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
     iny
     cpy #128
     bne @loopc
-    ldx #$25
+    ldx #$20
+    ldy #0
 @loopd:
     sec
     jsr win_putchr
     iny
     cpy #$a0
     bne @loopd
+    ldx #$25
+    ldy #0
+@loope:
+    sec
+    jsr win_putchr
+    iny
+    cpy #$a0
+    bne @loope
     ldx #0
     ldy #$0d
     sec
@@ -1057,12 +1064,12 @@ dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
     lda zm_windows
     ldx #$e0
     ldy #32
-@loope:
+@loopz:
     sec
     jsr win_putchr
     iny
     cpy #127
-    bne @loope
+    bne @loopz
 
     ldx #0
     ldy #$0d

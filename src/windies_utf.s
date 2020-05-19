@@ -128,7 +128,9 @@ map_entry = gREG::r10
     ply
     plx
 
-    ; And we're done
+    ; And we're done--is it a valid glyph?
+    bit #$40
+    bne @not_found_2
     sec
     rts
 
@@ -233,6 +235,7 @@ utf_xlat_default:
 ;   * Glyph index from overlay (layer 1) font
 ;   * Flags byte:
 ;       - $80 = reverse character colors
+;       - $40 = no glyph (do not print)
 ;       - $08 = flip overlay vertical
 ;       - $04 = flip overlay horizontal
 ;       - $03 = overlay index bits 9:8
@@ -437,7 +440,7 @@ utf_latin_1_supplement:
     .byte $19, $e4, $00
 
 utf_latin_extended_a:
-    .word 256, 128, utf_block_elements
+    .word 256, 128, utf_general_punctuation
     .byte $41, $c9, $00
     .byte $01, $e9, $00
     .byte $41, $c8, $00
@@ -566,6 +569,290 @@ utf_latin_extended_a:
     .byte $5a, $c8, $00
     .byte $1a, $e8, $00
     .byte $ff, $00, $00
+
+utf_general_punctuation:
+    .word $2000, 11, utf_general_punctuation_1
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+    .byte $20, $00, $00
+
+utf_general_punctuation_1:
+    .word $2010, 24, utf_general_punctuation_2
+    .byte $2d, $00, $00
+    .byte $2d, $00, $00
+    .byte $2d, $00, $00
+    .byte $2d, $00, $00
+    .byte $20, $b8, $01
+    .byte $20, $b8, $01
+    .byte $20, $b9, $01
+    .byte $20, $ba, $01
+    .byte $20, $86, $01
+    .byte $20, $87, $01
+    .byte $20, $86, $0d
+    .byte $20, $87, $05
+    .byte $20, $88, $01
+    .byte $20, $89, $01
+    .byte $20, $88, $0d
+    .byte $20, $89, $05
+
+    .byte $20, $b1, $01
+    .byte $2d, $b1, $01
+    .byte $20, $9c, $01
+    .byte $20, $9d, $01
+    .byte $2e, $00, $00
+    .byte $20, $9e, $01
+    .byte $20, $9f, $01
+    .byte $20, $44, $02
+
+utf_general_punctuation_2:
+    .word $202f, 49, utf_superscripts_and_subscripts
+    .byte $20, $00, $00
+    .byte $20, $af, $01
+    .byte $20, $b0, $01
+    .byte $20, $8a, $01
+    .byte $20, $8b, $01
+    .byte $20, $8c, $01
+    .byte $20, $8a, $05
+    .byte $20, $8b, $05
+    .byte $20, $8c, $05
+    .byte $20, $98, $01
+    .byte $20, $93, $01
+    .byte $20, $93, $05
+    .byte $20, $9a, $01
+    .byte $20, $82, $01
+    .byte $20, $85, $01
+    .byte $20, $97, $01
+    .byte $20, $95, $09
+
+    .byte $20, $95, $01
+    .byte $20, $99, $01
+    .byte $20, $9b, $01
+    .byte $2c, $d0, $00
+    .byte $20, $b4, $01
+    .byte $20, $90, $01
+    .byte $20, $90, $05
+    .byte $20, $b2, $01
+    .byte $20, $84, $01
+    .byte $20, $83, $01
+    .byte $20, $bb, $01
+    .byte $20, $a2, $01
+    .byte $20, $a3, $01
+    .byte $20, $a3, $05
+    .byte $20, $a0, $01
+    .byte $3a, $86, $09
+
+    .byte $20, $a4, $01
+    .byte $20, $a1, $01
+    .byte $20, $a5, $01
+    .byte $20, $a6, $01
+    .byte $20, $96, $09
+    .byte $20, $a7, $01
+    .byte $20, $a8, $01
+    .byte $20, $8d, $01
+    .byte $20, $a9, $01
+    .byte $20, $bc, $01
+    .byte $20, $aa, $01
+    .byte $20, $ab, $01
+    .byte $20, $ac, $01
+    .byte $20, $ad, $01
+    .byte $20, $ae, $01
+    .byte $20, $00, $00
+
+utf_superscripts_and_subscripts:
+    .word $2070, 45, utf_box_drawing
+    .byte $20, $c0, $02
+    .byte $20, $db, $02
+    .byte $20, $00, $40
+    .byte $20, $00, $40
+    .byte $20, $c4, $02
+    .byte $20, $c5, $02
+    .byte $20, $c6, $02
+    .byte $20, $c7, $02
+    .byte $20, $c8, $02
+    .byte $20, $c9, $02
+    .byte $20, $ca, $02
+    .byte $20, $cb, $02
+    .byte $20, $cc, $02
+    .byte $20, $cd, $02
+    .byte $20, $cd, $06
+    .byte $20, $d7, $02
+
+    .byte $20, $c0, $0a
+    .byte $20, $e1, $02
+    .byte $20, $e2, $02
+    .byte $20, $e3, $02
+    .byte $20, $e4, $02
+    .byte $20, $e5, $02
+    .byte $20, $c9, $0e
+    .byte $20, $e7, $02
+    .byte $20, $c8, $0a
+    .byte $20, $c6, $0e
+    .byte $20, $ca, $0a
+    .byte $20, $cb, $0a
+    .byte $20, $cc, $0a
+    .byte $20, $cd, $0a
+    .byte $20, $cd, $0e
+    .byte $20, $00, $40
+
+    .byte $20, $ee, $02
+    .byte $20, $d2, $0e
+    .byte $20, $d0, $0a
+    .byte $20, $d1, $0a
+    .byte $20, $cf, $0e
+    .byte $20, $f3, $02
+    .byte $20, $f4, $02
+    .byte $20, $f5, $02
+    .byte $20, $f6, $02
+    .byte $20, $f7, $02
+    .byte $20, $f8, $02
+    .byte $20, $d9, $0e
+    .byte $20, $fa, $02
+
+utf_box_drawing:
+    .word $2500, 128, utf_block_elements
+    .byte $40, $00, $00
+    .byte $40, $00, $00
+    .byte $5b, $00, $00
+    .byte $5b, $00, $00
+    .byte $20, $3c, $00
+    .byte $20, $3c, $00
+    .byte $20, $3b, $00
+    .byte $20, $3b, $00
+    .byte $20, $3e, $00
+    .byte $20, $3e, $00
+    .byte $20, $3d, $00
+    .byte $20, $3d, $00
+    .byte $20, $32, $08
+    .byte $20, $32, $08
+    .byte $20, $32, $08
+    .byte $20, $32, $08
+
+    .byte $20, $32, $0c
+    .byte $20, $32, $0c
+    .byte $20, $32, $0c
+    .byte $20, $32, $0c
+    .byte $20, $32, $00
+    .byte $20, $32, $00
+    .byte $20, $32, $00
+    .byte $20, $32, $00
+    .byte $20, $32, $04
+    .byte $20, $32, $04
+    .byte $20, $32, $04
+    .byte $20, $32, $04
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $04
+
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $40, $40, $08
+    .byte $40, $40, $08
+    .byte $40, $40, $08
+    .byte $40, $40, $08
+
+    .byte $40, $40, $08
+    .byte $40, $40, $08
+    .byte $40, $40, $08
+    .byte $40, $40, $08
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $20, $3a, $00
+    .byte $20, $3a, $00
+    .byte $20, $39, $00
+    .byte $20, $39, $00
+
+    .byte $40, $00, $00
+    .byte $5b, $00, $00
+    .byte $20, $32, $08
+    .byte $20, $32, $08
+    .byte $20, $32, $08
+    .byte $20, $32, $0c
+    .byte $20, $32, $0c
+    .byte $20, $32, $0c
+    .byte $20, $32, $00
+    .byte $20, $32, $00
+    .byte $20, $32, $00
+    .byte $20, $32, $04
+    .byte $20, $32, $04
+    .byte $20, $32, $04
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $04
+
+    .byte $5b, $3f, $04
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $5b, $3f, $00
+    .byte $40, $40, $08
+    .byte $40, $40, $08
+    .byte $40, $40, $08
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $40, $40, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $5b, $4c, $00
+    .byte $20, $38, $08
+    .byte $20, $38, $0c
+    .byte $20, $38, $04
+
+    .byte $20, $38, $00
+    .byte $20, $7f, $00
+    .byte $7f, $00, $00
+    .byte $7f, $7f, $00
+    .byte $20, $3f, $00
+    .byte $20, $40, $00
+    .byte $20, $3f, $04
+    .byte $20, $40, $08
+    .byte $20, $3f, $00
+    .byte $20, $40, $00
+    .byte $20, $3f, $04
+    .byte $20, $40, $08
+    .byte $40, $00, $00
+    .byte $5b, $00, $00
+    .byte $40, $00, $00
+    .byte $5b, $00, $00
 
 utf_block_elements:
     .word $2580, 32, private_use_e020_font_3
