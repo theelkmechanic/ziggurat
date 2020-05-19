@@ -8,8 +8,8 @@ Ziggurat is a Z-machine interpreter written from scratch in 65C02 assembly langu
 * I've just always wanted to write a Z-machine
 
 A lot of things work at this point for version 3 games. Lots of things still to do, though:
-* Redo text mode layering/font using 2bpp tiles for the overlay layer to increase font size
 * Split windowing code out into a separate library for easier reusability
+* Move character glyph map info into the font file (since it really belongs together and it can all live in VRAM then and free up more low memory, and also can have different font files)
 * Implementing opcodes for higher level games (Note: This includes actually checking the version of the game to see if the opcode is supported)
 * Blorb/Quetzal file support
 * Graphics mode for V6 games
