@@ -178,19 +178,20 @@
 .endproc
 
 .proc op_buffer_mode
-    jmp op_illegal
-
     lda #<msg_op_buffer_mode
     sta gREG::r6L
     lda #>msg_op_buffer_mode
     sta gREG::r6H
     jsr printf
+
+    ; Set buffer mode on main window
+    lda window_main
+    ldx operand_0+1
+    jsr win_setbuffer
     jmp fetch_and_dispatch
 .endproc
 
 .proc op_set_cursor
-    jmp op_illegal
-
     chkver V6,@nowindow
     ldy #<msg_op_set_cursor_v6
     ldx #>msg_op_set_cursor_v6
@@ -202,11 +203,65 @@
     sty gREG::r6L
     stx gREG::r6H
     jsr printf
+
+    ; Check v4 or later
+    chkver V1|V2|V3,@ok
+    jmp op_illegal
+
+@ok:
+    ; Set the cursor for the current window
+    ldy operand_0+1
+    ldx operand_1+1
+    dey
+    dex
+    lda current_window
+    jsr win_setcursor
+    jmp fetch_and_dispatch
+.endproc
+
+.proc op_get_cursor
+    lda #<msg_op_get_cursor
+    sta gREG::r6L
+    lda #>msg_op_get_cursor
+    sta gREG::r6H
+    jsr printf
+
+    ; Check v4 or later
+    chkver V1|V2|V3,@ok
+    jmp op_illegal
+
+@ok:
+    ; Get the address we want to store the cursor position in
+    ldx operand_0
+    ldy operand_0+1
+    jsr decode_baddr
+    sty zpu_mem
+    stx zpu_mem+1
+    sta zpu_mem+2
+    sta VIA1::PRA
+
+    ; Get the cursor for the current window
+    lda current_window
+    jsr win_getcursor
+    inx
+    iny
+
+    ; And store them in the array
+    lda #0
+    jsr mem_store_and_advance
+    tya
+    jsr mem_store_and_advance
+    lda #0
+    jsr mem_store_and_advance
+    txa
+    jsr mem_store_and_advance
     jmp fetch_and_dispatch
 .endproc
 
 .proc opext_set_font
     chkver V6,@nowindow
+    lda #ERR_ILLEGAL_OPCODE
+    jmp print_error_and_exit
     ldy #<msg_opext_set_font_v6
     ldx #>msg_opext_set_font_v6
     bra @debug
@@ -218,15 +273,9 @@
     stx gREG::r6H
     jsr printf
 
-    ; Look up the font of the current window
-    lda current_window
-    asl
-    tay
-    lda zm_window_fonts,y
-    tax
-    iny
-    lda zm_window_fonts,y
-    tay
+    ; Get the current font
+    ldx #0
+    ldy current_font
 
     ; Font 0 just returns the current font
     lda operand_0
@@ -244,19 +293,10 @@
     cmp #3
     beq @good_font
 @bad_font:
-    ldx #0
     ldy #0
     bra @done
 @good_font:
-    phx
-    lda current_window
-    asl
-    tax
-    stz zm_window_fonts,x
-    inx
-    lda operand_0+1
-    sta zm_window_fonts,x
-    plx
+    sta current_font
 
 @done:
     ; Store the previous font in the result
@@ -296,50 +336,160 @@
     jmp fetch_and_dispatch
 .endproc
 
-.proc op_erase_window
-    jmp op_illegal
+.proc op_erase_line
+    ; If operand_0 is 1, erase from the current cursor position in the current window to the end of the line
+    lda operand_0
+    bne @done
+    lda operand_0+1
+    cmp #1
+    bne @done
+    lda current_window
+    jsr win_getsize
+    cpy #0
+    bne @done
+    jsr win_erasecurrtoeol
 
+@done:
+    jmp fetch_and_dispatch
+.endproc
+
+.proc op_erase_window
     lda #<msg_op_erase_window
     sta gREG::r6L
     lda #>msg_op_erase_window
     sta gREG::r6H
     jsr printf
+
+    ; Valid from V4 on
+    chkver V1|V2|V3,@ok
+    jmp op_illegal
+
+@ok:
+    ; Which window are we erasing?
+    lda operand_0
+    beq @checkvalid
+    cmp #$ff
+    beq @special
+@done:
     jmp fetch_and_dispatch
+
+@checkvalid:
+    ; Is it window 0 or 1?
+    lda operand_0+1
+    beq @erase_main
+    cmp #1
+    bne @done
+
+    ; Erase the upper window
+    lda window_upper
+    jsr win_clear
+    bra @done
+
+@erase_main:
+    ; Erase the main window
+    lda window_main
+    jsr win_clear
+
+    ; For version 4, put the cursor at the bottom
+    chkver V4,@done
+    lda window_main
+    jsr win_getsize
+    cpy #2
+    bcc @done
+    dey
+    ldx #0
+    jsr win_setcursor
+    bra @done
+
+@special:
+    lda operand_0+1
+    cmp #$fe
+    bcc @done
+    cmp #$ff
+    bne @justclear
+
+    ; Unsplit and clear
+    lda window_upper
+    jsr win_getsize
+    cpy #0
+    beq @justclear
+    jsr do_split_window
+    bra @done
+
+@justclear:
+    ; Clear upper and lower windows
+    lda window_upper
+    jsr win_clear
+    lda window_main
+    jsr win_clear
+
+    ; For V4, put lower window cursor at bottom line
+    chkver V4,@done
+    lda window_main
+    jsr win_getsize
+    cpy #0
+    beq @done
+    dey
+    sty $420
+    jsr win_getcursor
+    cpy $420
+    bcs @done
+    ldy $420
+    ldx #0
+    jsr win_setcursor
+    bra @done
 .endproc
 
 .proc op_set_text_style
- ;   jmp op_illegal
-
     lda #<msg_op_set_text_style
     sta gREG::r6L
     lda #>msg_op_set_text_style
     sta gREG::r6H
     jsr printf
+
+    ; Set the appropriate text style
+    ldx operand_0+1
+    lda window_main
+    jsr win_setstyle
+    lda window_upper
+    jsr win_setstyle
+
     jmp fetch_and_dispatch
 .endproc
 
 .proc op_set_window
-    jmp op_illegal
-
     lda #<msg_op_set_window
     sta gREG::r6L
     lda #>msg_op_set_window
     sta gREG::r6H
     jsr printf
+
+    ; Which window are we setting to?
+    lda operand_0
+    bne @done
+    lda operand_0
+    beq @setmain
+    dec
+    bne @done
+
+    ; Set to upper window and move cursor to top left
+    lda window_upper
+    sta current_window
+    ldx #0
+    ldy #0
+    jsr win_setcursor
+    bra @done
+
+@setmain:
+    ; Set to main window
+    lda window_main
+    sta current_window
+
+@done:
     jmp fetch_and_dispatch
 .endproc
 
 .proc op_split_window
-    jmp op_illegal
-
-@main_left = $420
-@main_top = $421
-@main_width = $422
-@main_height = $423
-@main_cur_x = $424
-@main_cur_y = $425
-@upper_height = $426
-@upper_diff = $427
 
     lda #<msg_op_split_window
     sta gREG::r6L
@@ -347,70 +497,169 @@
     sta gREG::r6H
     jsr printf
 
-    ; Are we splitting or closing?
-    lda operand_0+1
-    beq @unsplit
+    jsr do_split_window
+    jmp fetch_and_dispatch
+.endproc
 
-    ; Get the main window info
-    lda zm_windows
+.proc do_split_window
+@main_top = $420
+@main_height = $421
+@main_cur_y = $422
+@upper_top = $423
+@upper_height = $424
+@upper_diff = $425
+
+    ; Get the current state of things
+    lda window_main
     jsr win_getpos
-    stx @main_left
     sty @main_top
     jsr win_getsize
-    stx @main_width
     sty @main_height
     jsr win_getcursor
-    stx @main_cur_x
     sty @main_cur_y
-
-    ; See if we have an upper window already
-    lda zm_windows+1
-    bmi @have_upper
-    jsr win_open
-    sta zm_windows+1
-
-@have_upper:
-    ; Set the upper window as current
-    sta current_window
-
-    ; Get upper window height
+    lda window_upper
+    jsr win_getpos
+    sty @upper_top
     jsr win_getsize
     sty @upper_height
 
-    ; Figure out the difference in height
+    ; Are we unsplitting?
+    lda operand_0
+    ora operand_0+1
+    bne @do_split
+
+@do_unsplit:
+    ; Make sure main is current window
+    lda window_main
+    sta current_window
+
+    ; Do we need to unsplit?
+    ldy @upper_height
+    bne @calc_change
+    jmp @done
+
+@calc_change:
+    ; Figure out how many lines we're going to move main up
+    lda @main_top
+    sec
+    sbc @upper_top
+    sta @upper_diff
+
+    ; Move main up, expand it, and move its cursor down, and set upper height to 0
+    lda @main_height
+    clc
+    adc @upper_diff
+    sta @main_height
+    chkver V4,@noforcebottom
+    lda @main_height
+    dec
+    bra @setmaincury
+@noforcebottom:
+    lda @main_cur_y
+    clc
+    adc @upper_diff
+@setmaincury:
+    sta @main_cur_y
+    lda @upper_top
+    sta @main_top
+    stz @upper_height
+    jmp @update_windows
+
+@do_split:
+    ; Make sure upper is current window
+    lda window_main
+    sta current_window
+
+    ; Upper height needs to get set to the param but not more than screen height
+    lda operand_0
+    beq @calcupperheight
+    lda #$ff
+    sta operand_0+1
+@calcupperheight:
+    lda #SCREEN_HEIGHT
+    sec
+    sbc @upper_top
+    cmp operand_0+1
+    bcs @upperheightok
+    sta operand_0+1
+@upperheightok:
     lda operand_0+1
     sec
     sbc @upper_height
     sta @upper_diff
+    bmi @shrinking
+    bne @growing
+    jmp @done
 
-    ; Move the main window down
+@growing:
+    ; Grow the upper window and shrink the main window
+    lda @upper_height
+    clc
+    adc @upper_diff
+    sta @upper_height
+    lda @main_top
+    clc
+    adc @upper_diff
+    sta @main_top
+    lda @main_cur_y
+    sec
+    sbc @upper_diff
+    bpl @yinrange
+    lda #0
+@yinrange:
+    sta @main_cur_y
+    lda @main_height
+    sec
+    sbc @upper_diff
+    sta @main_height
+    bra @update_windows
 
-@unsplit:
-    ; See if we have an upper window
-    lda zm_windows+1
-    bmi @done
+@shrinking:
+    ; Shrink the upper window and grow the main window
+    lda @upper_height
+    sec
+    sbc @upper_diff
+    sta @upper_height
+    lda @main_top
+    sec
+    sbc @upper_diff
+    sta @main_top
+    lda @main_cur_y
+    clc
+    adc @upper_diff
+    sta @main_cur_y
+    lda @main_height
+    clc
+    adc @upper_diff
+    sta @main_height
 
-    ; Get the cursor position of the upper window and close it
+@update_windows:
+    ; Update main and upper windows
+    lda window_main
+    jsr win_getpos
+    ldy @main_top
+    jsr win_setpos
+    jsr win_getsize
+    ldy @main_height
+    jsr win_setsize
     jsr win_getcursor
-    jsr win_close
-
-    ; Set the main window cursor
-    lda zm_windows
+    ldy @main_cur_y
     jsr win_setcursor
-
-    ; Move the main window back to the top and resize it
+    lda window_upper
+    jsr win_getsize
+    ldx @upper_height
+    jsr win_setsize
     ldx #0
     ldy #0
-    jsr win_setpos
-    ldx #SCREEN_WIDTH
-    ldy #SCREEN_HEIGHT
-    jsr win_setsize
+    jsr win_setcursor
 
-    ; Set the main window as current
-    sta current_window
+    ; Clear upper window in V3
+    chkver V3, @done
+    lda window_upper
+    jsr win_clear
 
 @done:
-    jmp fetch_and_dispatch
+    rts
 .endproc
 
 .proc op_set_colour
@@ -428,12 +677,44 @@
     stx gREG::r6H
     jsr printf
 
+    ; Set the appropriate text colors
+    lda window_main
+    jsr win_getcolor
+    lda operand_1+1
+    bne @checkdefaultbg
+    txa
+    and #$f0
+    bra @getfg
+@checkdefaultbg:
+    cmp #1
+    bpl @setbg
+    lda #DEFAULT_BG
+@setbg:
+    asl
+    asl
+    asl
+    asl
+
+@getfg:
+    sta operand_1+1
+    lda operand_0+1
+    bne @checkdefaultfg
+    txa
+    bra @setfg
+@checkdefaultfg:
+    cmp #1
+    bpl @setfg
+    lda #DEFAULT_FG
+@setfg:
+    and #$0f
+    ora operand_1+1
+    lda window_main
+    jsr win_setcolor
+    lda window_upper
+    jsr win_setcolor
+
     jmp fetch_and_dispatch
 .endproc
-
-op_get_cursor:
-op_erase_line:
-    jmp op_illegal
 
 opext_buffer_screen:
 opext_set_true_colour:
@@ -463,6 +744,7 @@ msg_op_output_stream_v5:    .byte "Output stream @ table=@", CH::ENTER, 0
 msg_op_output_stream_v6:    .byte "Output stream @ table=@ width=@", CH::ENTER, 0
 msg_op_set_cursor:          .byte "Setting cursor line=@ col=@", CH::ENTER, 0
 msg_op_set_cursor_v6:       .byte "Setting cursor line=@ col=@ window=@", CH::ENTER, 0
+msg_op_get_cursor:          .byte "Getting cursor into @", CH::ENTER, 0
 msg_opext_set_font:         .byte "Setting font @", CH::ENTER, 0
 msg_opext_set_font_v6:      .byte "Setting font @ window=@", CH::ENTER, 0
 msg_op_show_status:         .byte "Show status", CH::ENTER, 0

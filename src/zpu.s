@@ -42,11 +42,12 @@ objentry_offset_sibling: .res 1
 objentry_offset_child: .res 1
 objentry_offset_propaddr: .res 1
 line_counter: .res 1
+window_main: .res 1
+window_upper: .res 1
 window_status: .res 1
 window_debug: .res 1
 current_window: .res 1
-zm_windows: .res 8
-zm_window_fonts: .res 8*2
+current_font: .res 1
 printf_use_chrout: .res 1
 
 .code
@@ -213,9 +214,9 @@ printf_use_chrout: .res 1
     lda #<(SCREEN_HEIGHT * FONT_HEIGHT)
     sta ZMheader::height_u+1
 
-    lda #2
+    lda #DEFAULT_BG
     sta ZMheader::dflt_bg
-    lda #5
+    lda #DEFAULT_FG
     sta ZMheader::dflt_fg
 
     ; V5 and V6 store font widths backwards from each other
@@ -313,35 +314,39 @@ printf_use_chrout: .res 1
     sta utf_xlat_addr+2
 
 @init_windows:
-    ; Open our windows (main, status, and debug)
-    ldx #7
+    ; Open our windows (main, upper, status, and debug)
+    ldx #3
     lda #$ff
 @clearwinlist:
-    sta zm_windows,x
+    sta window_main,x
     dex
     bpl @clearwinlist
-    sta window_status
-    sta window_debug
-    lda #0
-    tax
-@initwinfontlist:
-    sta zm_window_fonts,x
-    inx
-    sta zm_window_fonts,x
-    inc zm_window_fonts,x
-    inx
-    cpx #8*2
-    bne @initwinfontlist
+    inc
+    inc
+    sta current_font
     jsr win_open
-    sta zm_windows
-    stz current_window
+    sta window_main
+    sta current_window
     ldx #SCREEN_WIDTH
     ldy #SCREEN_HEIGHT
+    jsr win_setsize
+    jsr win_open
+    sta window_upper
+    ldx #SCREEN_WIDTH
+    ldy #0
     jsr win_setsize
     chkver V1|V2|V3,@dontneedstatus
     jsr win_open
     sta window_status
     ldy #1
+    jsr win_setsize
+    ldx #0
+    lda window_upper
+    jsr win_setpos
+    lda window_main
+    jsr win_setpos
+    jsr win_getsize
+    dey
     jsr win_setsize
 
 @dontneedstatus:
@@ -351,15 +356,26 @@ printf_use_chrout: .res 1
     ldy #30-SCREEN_HEIGHT
     jsr win_setsize
 .endif
-    lda zm_windows
-    ldx #(W_BLACK << 4) + W_LGREY
+    lda window_main
+    ldx #(DEFAULT_BG << 4) | DEFAULT_FG
     jsr win_setcolor
     ldx #1
     jsr win_setbuffer
+    jsr win_setwrap
+    jsr win_setscroll
     jsr win_clear
+    jsr win_getsize
+    chkver V5|V6|V7|V8,@gotobottom
+    ldy #1
+@gotobottom:
     ldx #0
-    ldy #SCREEN_HEIGHT-1
+    dey
+    lda window_main
     jsr win_setcursor
+
+    jsr win_getcolor
+    lda window_upper
+    jsr win_setcolor
 
     lda window_debug
     bmi @nodebugwindow
@@ -367,18 +383,17 @@ printf_use_chrout: .res 1
     jsr win_setpos
     ldx #(W_BLUE << 4) + W_WHITE
     jsr win_setcolor
-    ldx #0
-    jsr win_setbuffer
+    ldx #1
+    jsr win_setwrap
+    jsr win_setscroll
     jsr win_clear
 
 @nodebugwindow:
     chkver V1|V2|V3,@start_zmachine
     lda window_status
-    ldx #(W_LGREY << 4) + W_BLACK
+    ldx #(DEFAULT_FG << 4) | DEFAULT_BG
     jsr win_setcolor
-    ldx #0
-    jsr win_setwrap
-    jsr win_setbuffer
+    jsr win_clear
 
 @start_zmachine:
 ;    jsr debugchrdump
@@ -978,7 +993,7 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     beq @dun
     phy
     tay
-    lda zm_windows
+    lda window_main
     sec
     jsr win_putchr
     ply
@@ -1010,7 +1025,7 @@ dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
     sta gREG::r6H
     jsr debugprtstr
 
-    lda zm_windows
+    lda window_main
     ldx #0
     ldy #32
 @loopa:
@@ -1061,7 +1076,7 @@ dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
     sta gREG::r6H
     jsr debugprtstr
 
-    lda zm_windows
+    lda window_main
     ldx #$e0
     ldy #32
 @loopz:

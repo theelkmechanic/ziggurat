@@ -68,6 +68,12 @@ drawchar_flags: .res 1
     ; Set the advance flag
     ror putch_flags
 
+    ; Don't do anything in zero-height windows
+    ldy #Window::height
+    lda (win_ptr),y
+    beq @done
+    ldy putch_utf16
+
     ; Check for special characters
     cpx #0
     bne @printable
@@ -88,8 +94,7 @@ drawchar_flags: .res 1
 
 @do_crlf:
     ; If not both buffering and wrapping, can just do newline
-    ldy #0
-    lda (win_ptr),y
+    lda (win_ptr)
     and #WIN_BUFFER | WIN_WRAP
     cmp #WIN_BUFFER | WIN_WRAP
     bne @do_newline
@@ -155,8 +160,20 @@ drawchar_flags: .res 1
     lda (win_ptr)
     bcc @printit
 
-    ; If we hit the window width, exit it we're not wrapping
-    and #WIN_WRAP
+    ; If we hit the window end, exit if we're not scrolling
+    bit #WIN_SCROLL
+    bne @check_wrap
+    ldy #Window::cur_y
+    lda (win_ptr),y
+    inc
+    ldy #Window::height
+    cmp (win_ptr),y
+    bcs @done
+    lda (win_ptr)
+
+@check_wrap:
+    ; If we hit the window width, exit if we're not wrapping
+    bit #WIN_WRAP
     beq @done
 
     ; Wrap to next line
@@ -168,6 +185,62 @@ drawchar_flags: .res 1
     ldy #Window::colors
     lda (win_ptr),y
     tax
+
+    ; Apply the style to the colors
+    lda (win_ptr)
+    bit #WINSTYLE_ITALIC
+    beq @checkbold
+
+    ; Italic style, so map the foreground color
+    txa
+    and #$f0
+    sta drawchar_colors
+    txa
+    and #$0f
+    tax
+    lda colormap_italic,x
+    ora drawchar_colors
+    tax
+    bra @done_style
+
+@checkbold:
+    bit #WINSTYLE_BOLD
+    beq @checkreverse
+
+    ; Bold style, so map the foreground color
+    txa
+    and #$f0
+    sta drawchar_colors
+    txa
+    and #$0f
+    tax
+    lda colormap_bold,x
+    ora drawchar_colors
+    tax
+    bra @done_style
+
+@checkreverse:
+    bit #WINSTYLE_REVERSE
+    beq @done_style
+
+    ; Reverse video style, so swap colors
+    txa
+    asl
+    asl
+    asl
+    asl
+    pha
+    txa
+    lsr
+    lsr
+    lsr
+    lsr
+    sta drawchar_colors
+    pla
+    ora drawchar_colors
+    tax
+
+@done_style:
     pla
 
     ; Now check to see if we should be buffering
@@ -185,7 +258,7 @@ drawchar_flags: .res 1
     jsr bufferchar
 
     ; See if we're supposed to print the character
-    bcs @done
+    bcs @jump_done
     ldx bufferchar_colors
 
 @actuallyprint:
@@ -240,12 +313,19 @@ drawchar_flags: .res 1
     lda (win_ptr),y
     inc
 
-    ; If we hit the end of the window, scroll it
+    ; If we hit the end of the window, scroll it if we're allowed
     cmp newline_winheight
     bcc @1
+    pha
+    lda (win_ptr)
+    and #WIN_SCROLL
+    tax
+    pla
+    cpx #0
+    beq @2
     jmp curwin_scroll
 @1: sta (win_ptr),y
-    rts
+@2: rts
 .endproc
 
 ; bufferchar - Handle character buffering in the current window
@@ -544,3 +624,10 @@ drawchar_flags: .res 1
     clc
     jmp @done
 .endproc
+
+.rodata
+
+colormap_bold:
+    .byte 0, 0, W_BLACK, W_MAGENTA, W_WHITE, W_WHITE, W_CYAN, W_MAGENTA, W_WHITE, W_WHITE, W_WHITE, W_MGREY, W_BLACK, 0, 0, 0
+colormap_italic:
+    .byte 0, 0, W_DGREY, W_YELLOW, W_YELLOW, W_GREEN, W_YELLOW, W_CYAN, W_GREEN, W_LGREY, W_YELLOW, W_MGREY, W_BLUE, 0, 0, 0

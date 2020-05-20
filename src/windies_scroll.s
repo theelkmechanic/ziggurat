@@ -33,6 +33,7 @@ curr_line: .res 1
     ; The number of rows to scroll is the heigth of the window minus 1
     ldy #Window::height
     lda (win_ptr),y
+    beq @scroll_done
     dec
     sta lines
 
@@ -168,6 +169,7 @@ curr_line: .res 1
     ; Start row to scroll is the heigth of the window minus 2
     iny
     lda (win_ptr),y
+    beq @scroll_done
     dec
     dec
     sta curr_line
@@ -218,6 +220,7 @@ curr_line: .res 1
     ; And clear the first line
     lda #0
     jsr curwin_clearline
+@scroll_done:
     rts
 .endproc
 

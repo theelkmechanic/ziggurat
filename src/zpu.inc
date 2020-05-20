@@ -161,6 +161,7 @@
 .global op_show_status
 .global op_sound_effect
 .global op_split_window
+.global do_split_window ; This is a helper that does the work of op_split_window so op_erase_window can use it
 .global op_store
 .global op_storeb
 .global op_storew
@@ -237,13 +238,17 @@
 .global objentry_offset_sibling
 .global objentry_offset_child
 .global objentry_offset_propaddr
+.global window_main
+.global window_upper
 .global window_status
 .global current_window
-.global zm_windows
-.global zm_window_fonts
+.global current_font
 
 .define SHOW_DEBUG_WINDOW 0
 .define SCREEN_HEIGHT 30
 .define SCREEN_WIDTH 80
-.define FONT_WIDTH 4
-.define FONT_HEIGHT 8
+.define FONT_WIDTH 1
+.define FONT_HEIGHT 1
+
+.define DEFAULT_FG W_GREEN
+.define DEFAULT_BG W_BLACK

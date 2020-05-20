@@ -21,10 +21,26 @@ op_restore:
     jmp op_illegal
 
 opext_restore:
-opext_restore_undo:
 opext_save:
-opext_save_undo:
     jmp opext_illegal
+
+.proc opext_restore_undo
+    lda #<msg_restore_undo
+    sta gREG::r6L
+    lda #>msg_restore_undo
+    sta gREG::r6H
+    jsr printf
+    jmp fetch_and_dispatch
+.endproc
+
+.proc opext_save_undo
+    lda #<msg_save_undo
+    sta gREG::r6L
+    lda #>msg_save_undo
+    sta gREG::r6H
+    jsr printf
+    jmp fetch_and_dispatch
+.endproc
 
 .proc op_verify
     ; Validate the loaded data
@@ -162,3 +178,5 @@ opext_save_undo:
 .rodata
 
 msg_validating:                 .byte "Validating Z-machine data", CH::ENTER, 0
+msg_restore_undo:               .byte "Restoring from undo state (unimplemented)", CH::ENTER, 0
+msg_save_undo:                  .byte "Saving undo state (unimplemented)", CH::ENTER, 0

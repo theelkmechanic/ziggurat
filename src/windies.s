@@ -4,7 +4,7 @@
 
 .bss
 
-win_buffers: .res 80*4*8
+win_buffers: .res 80*3*4
 buf_off: .res 2
 
 .code
@@ -61,7 +61,7 @@ buf_off: .res 2
 
 @found:
     ; Set the open flag
-    lda #WIN_ISOPEN | WIN_WRAP
+    lda #WIN_ISOPEN
     sta (win_tbl),y
 
     ; Divide by 16 to get the window ID
@@ -132,9 +132,52 @@ buf_off: .res 2
     cpx #0
     beq @clearit
     ora #WIN_WRAP
-    .byte $42
+    .byte $2c
 @clearit:
     and #($FF & ~WIN_WRAP)
+    sta (win_ptr)
+    pla
+    rts
+.endproc
+
+; win_setscroll - Set window scroll flag
+; In:   a           - Window ID (0-MAX_WINDOWS-1)
+;       x           - Scroll flag (0 = disabled, non-zero = enabled)
+.proc win_setscroll
+    ; Get the window table entry pointer
+    jsr win_getptr
+
+    ; Are we setting or clearing the flag?
+    pha
+    lda (win_ptr)
+    cpx #0
+    beq @clearit
+    ora #WIN_SCROLL
+    .byte $2c
+@clearit:
+    and #($FF & ~WIN_SCROLL)
+    sta (win_ptr)
+    pla
+    rts
+.endproc
+
+; win_setstyle - Set window style flags
+; In:   a           - Window ID (0-MAX_WINDOWS-1)
+;       x           - Style flags
+.proc win_setstyle
+    ; Get the window table entry pointer
+    jsr win_getptr
+
+    ; Clear old flags
+    pha
+    lda (win_ptr)
+    and #($FF & ~WIN_STYLEFLAGS)
+    sta (win_ptr)
+
+    ; And set new ones
+    txa
+    and #WIN_STYLEFLAGS
+    ora (win_ptr)
     sta (win_ptr)
     pla
     rts
@@ -199,6 +242,7 @@ buf_off: .res 2
     jsr win_getptr
 
     ; Are we turning on buffering?
+    phx
     pha
     lda (win_ptr)
     cpx #0
@@ -242,10 +286,10 @@ buf_off: .res 2
     ; Then add the buffer base and store in the window buffer address
     phy
     ldy #Window::bufptr
+    iny
     lda #<win_buffers
     clc
     adc buf_off
-    iny
     sta (win_ptr),y
     lda #>win_buffers
     adc buf_off
@@ -264,6 +308,7 @@ buf_off: .res 2
     sta (win_ptr)
 @done:
     pla
+    plx
     rts
 .endproc
 
@@ -412,11 +457,11 @@ set_y_from_a:
     ldy #Window::height
     lda (win_ptr),y
     tay
-    dey
+    bra @2
 @1: phy
     jsr curwin_clearline
     ply
-    dey
+@2: dey
     bpl @1
 
     ; And set cursor position back to 0,0
@@ -426,6 +471,64 @@ set_y_from_a:
     iny
     sta (win_ptr),y
     ply
+    plx
+    pla
+    rts
+.endproc
+
+
+; win_erasecurrtoeol - Erase from the current cursor position to the end of its line
+; In:   a           - Window ID (0-MAX_WINDOWS-1)
+.proc win_erasecurrtoeol
+    ; Get the window table entry pointer
+    jsr win_getptr
+
+    ; Calculate the cursor position address and put in VERA::ADDR0
+    pha
+    phx
+    phy
+    ldy #Window::cur_x
+    lda (win_ptr),y
+    tax
+    iny
+    lda (win_ptr),y
+    tay
+    jsr curwin_calcaddr
+    lda VERA::CTRL
+    ora #$01
+    sta VERA::CTRL
+    lda #$10
+    sta VERA::ADDR+2
+    stx VERA::ADDR+1
+    sty VERA::ADDR
+    lda VERA::CTRL
+    and #$fe
+    sta VERA::CTRL
+    lda #$10
+    sta VERA::ADDR+2
+    txa
+    ora #$20
+    sta VERA::ADDR+1
+    sty VERA::ADDR
+
+    ; Now get the remaining width and write that many spaces to the window
+    ldy #Window::width
+    lda (win_ptr),y
+    ldy #Window::cur_x
+    sec
+    sbc (win_ptr),y
+    tax
+    ldy #Window::colors
+    lda (win_ptr),y
+    ldy #' '
+@1: dex
+    bpl @2
+    stz VERA::DATA0
+    stz VERA::DATA0
+    sty VERA::DATA1
+    sta VERA::DATA1
+    bra @1
+@2: ply
     plx
     pla
     rts

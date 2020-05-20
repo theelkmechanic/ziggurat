@@ -14,7 +14,7 @@
     scrlcnt .byte
 .endstruct
 
-MAX_WINDOWS = 10
+MAX_WINDOWS = 4
 
 VERA_DC_VIDEO = $9f29
 VERA_DC_HSCALE = $9f2a
