@@ -413,6 +413,8 @@
     jsr win_getsize
     cpy #0
     beq @justclear
+    stz operand_0
+    stz operand_0+1
     jsr do_split_window
     bra @done
 
@@ -437,7 +439,7 @@
     ldy $420
     ldx #0
     jsr win_setcursor
-    bra @done
+    jmp @done
 .endproc
 
 .proc op_set_text_style
@@ -567,7 +569,7 @@
 
 @do_split:
     ; Make sure upper is current window
-    lda window_main
+    lda window_upper
     sta current_window
 
     ; Upper height needs to get set to the param but not more than screen height
@@ -647,7 +649,7 @@
     jsr win_setcursor
     lda window_upper
     jsr win_getsize
-    ldx @upper_height
+    ldy @upper_height
     jsr win_setsize
     ldx #0
     ldy #0
