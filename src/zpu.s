@@ -365,9 +365,6 @@ printf_use_chrout: .res 1
     jsr win_setscroll
     jsr win_clear
     jsr win_getsize
-    chkver V5|V6|V7|V8,@gotobottom
-    ldy #1
-@gotobottom:
     ldx #0
     dey
     lda window_main
@@ -379,7 +376,8 @@ printf_use_chrout: .res 1
 
     lda window_debug
     bmi @nodebugwindow
-    iny
+    ldx #0
+    ldy #SCREEN_HEIGHT
     jsr win_setpos
     ldx #(W_BLUE << 4) + W_WHITE
     jsr win_setcolor
@@ -403,7 +401,7 @@ printf_use_chrout: .res 1
     sta gREG::r6L
     lda #>msg_launching
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Initialize SP/BP to top of low memory (we will grow down)
     sec
@@ -717,7 +715,9 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
 ; In:   a           - Error message number
 ;       op0-op9     - Error parameters to print
 .proc print_error_and_exit
-    ; Reset the screen
+    ; Reset the screen if we don't have a debug window
+    bit window_debug
+    bpl @showerror
     pha
     jsr CINT
     lda #2
@@ -726,9 +726,10 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     jsr SCREEN_SET_CHARSET
     dec printf_use_chrout
     stz window_debug
-
-    ; Get an offset into the error message table
     pla
+
+@showerror:
+    ; Get an offset into the error message table
     asl
     tax
     lda error_msg_list,x
@@ -876,9 +877,9 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     bra @1
 
 @exit:
-;    jsr GETIN
-;    cmp #' '
-;    bne @exit
+    jsr GETIN
+    cmp #' '
+    bne @exit
     ply
     plx
     pla

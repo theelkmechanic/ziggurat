@@ -23,7 +23,7 @@
     sta gREG::r6L
     lda #>msg_unimplemented
     sta gREG::r6H
-    jsr printf
+;    jsr printf
     jmp fetch_and_dispatch
 .endproc
 

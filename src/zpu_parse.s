@@ -53,7 +53,7 @@ op_input_stream:
     sta gREG::r6L
     lda #>msg_op_read_char
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Flush the current buffer and reset the scroll count
     lda current_window
@@ -167,7 +167,7 @@ op_input_stream:
     sta gREG::r6L
     lda #>msg_op_read
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Show the status line in versions 1-3
     lda zpu_verflag
@@ -686,7 +686,7 @@ op_input_stream:
     sta gREG::r6L
     lda #>msg_op_tokenise
     sta gREG::r6H
-    jsr printf
+;    jsr printf
     jsr parse_text
     jmp fetch_and_dispatch
 .endproc

@@ -33,7 +33,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_setclear_attr
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of our object
     ldx operand_0
@@ -70,7 +70,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_test_attr
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of our object
     ldx operand_0
@@ -99,7 +99,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_get_parent
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of the destination object
     ldx operand_0
@@ -121,7 +121,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_get_sibling
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of the destination object
     ldx operand_0
@@ -156,7 +156,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_get_child
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of the destination object
     ldx operand_0
@@ -174,7 +174,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_jin
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Get the test object
     ldx operand_0
@@ -197,7 +197,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_insert_obj
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Make sure they're passing a real object
     lda operand_0
@@ -260,7 +260,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_remove_obj
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Make sure they're passing a real object
     lda operand_0
@@ -413,7 +413,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_get_prop
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of our object
     ldx operand_0
@@ -469,7 +469,7 @@ set_or_clear = $400
     sta gREG::r6L
     lda #>msg_op_get_next_prop
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of our object
     ldx operand_0
@@ -517,7 +517,7 @@ get_prop_store_result:
     sta gREG::r6L
     lda #>msg_op_storing_result
     sta gREG::r6H
-    jsr printf
+;    jsr printf
     lda operand_0
     clc ; Push to stack if necessary
     jsr store_varvalue
@@ -532,7 +532,7 @@ prop_not_found:
     sta gREG::r6L
     lda #>msg_op_get_prop_addr
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of our object
     ldx operand_0
@@ -563,7 +563,7 @@ prop_not_found:
     sta gREG::r6L
     lda #>msg_op_get_prop_len
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Operand_0 is the address of the property data. Given that, step back to find the length.
     ldx operand_0
@@ -597,7 +597,7 @@ prop_not_found:
     sta gREG::r6L
     lda #>msg_op_put_prop
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Find the base address of our object
     ldx operand_0

@@ -22,7 +22,7 @@ retreat_save: .res 1
     stx gREG::r6L
     ldx #>msg_loading
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Fetch the variable # from r0
     lda operand_0+1
@@ -44,7 +44,7 @@ retreat_save: .res 1
     stx gREG::r6L
     ldx #>msg_loading_byte
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Add index to array base
     clc
@@ -83,7 +83,7 @@ retreat_save: .res 1
     stx gREG::r6L
     ldx #>msg_loading_word
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Add index to array base
     asl operand_1+1
@@ -122,7 +122,7 @@ retreat_save: .res 1
     sta gREG::r6L
     lda #>msg_storing
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Variable # is in r0, value in r1
     lda operand_0+1
@@ -138,7 +138,7 @@ retreat_save: .res 1
     stx gREG::r6L
     ldx #>msg_storing_byte
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Add index to array base
     clc
@@ -168,7 +168,7 @@ retreat_save: .res 1
     stx gREG::r6L
     ldx #>msg_storing_word
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Add index to array base
     asl operand_1+1
@@ -756,7 +756,7 @@ mem2_advance_skip:
     sta gREG::r6L
     lda #>msg_op_pull
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Check for version 6 behavior
     chkver V6,@normal_pull
@@ -872,7 +872,7 @@ mem2_advance_skip:
     sta gREG::r6L
     lda #>msg_op_push
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Push the value in r0 onto the stack
     ldx operand_0
@@ -993,7 +993,7 @@ mem2_advance_skip:
     stx gREG::r6L
     ldx #>msg_op_copy_table
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Get the first address
     ldx @first
@@ -1209,7 +1209,7 @@ mem2_advance_skip:
     stx gREG::r6L
     ldx #>msg_op_scan_table
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Check the form (if present)
     lda num_operands

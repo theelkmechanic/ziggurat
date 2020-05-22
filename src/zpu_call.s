@@ -16,7 +16,7 @@ op_call_void:
     sta gREG::r6L
     lda #>msg_op_call_void
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; For calls that don't save the result, clear the high bit in our param info byte
     ldy #0
@@ -28,7 +28,7 @@ op_call_save:
     sta gREG::r6L
     lda #>msg_op_call_save
     sta gREG::r6H
-    jsr printf
+;    jsr printf
     ; For calls that save the result, set the high bit in our param info byte
     ldy #$80
 
@@ -162,7 +162,7 @@ ops_and_locals = $401
     sta gREG::r6L
     lda #>msg_op_check_arg_count
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; The number of arguments to the current routine is stored in the parameter flag byte,
     ; which is at BP+5, in bits 6-4.
@@ -192,7 +192,7 @@ ops_and_locals = $401
     sta gREG::r6L
     lda #>msg_op_test
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Calculate r0 & r1 and fall through to op_je to test if it equals r1
     lda operand_0
@@ -230,7 +230,7 @@ ops_and_locals = $401
 @debug:
     sty gREG::r6L
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     asl
     sta num_operands
@@ -261,11 +261,11 @@ ops_and_locals = $401
 .endproc
 
 .proc op_jg
-    lda #<msg_op_jl
+    lda #<msg_op_jg
     sta gREG::r6L
-    lda #>msg_op_jl
+    lda #>msg_op_jg
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Swap parameters and do a less than instead
     ldx operand_0
@@ -285,7 +285,7 @@ do_lt:
     sta gREG::r6L
     lda #>msg_op_jl
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Branch if first parameter is less than second parameter
     lda num_operands
@@ -318,7 +318,7 @@ do_lt:
     sta gREG::r6L
     lda #>msg_op_jz
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 .endproc
 
 .proc do_jz
@@ -366,7 +366,7 @@ do_lt:
     sta gREG::r6L
     lda #>msg_branch
     sta gREG::r6H
-    jsr printf
+;    jsr printf
     lda operand_1
 
 ; Use temp storage at $400 for these function locals
@@ -414,7 +414,7 @@ do_branch_flag = $402
     sta gREG::r6L
     lda #>msg_branching
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Check for 0/1 offset, which mean return false/true from current routine instead
     ; of doing a branch
@@ -484,7 +484,7 @@ do_branch_flag = $402
     sta gREG::r6L
     lda #>msg_jumping
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Put branch offset from r0 into x/y
     ldx operand_0
@@ -578,7 +578,7 @@ do_branch_flag = $402
 
     ; And start executing the next instruction
 @done:
-    jsr printf
+;    jsr printf
     jmp fetch_and_dispatch
 .endproc
 

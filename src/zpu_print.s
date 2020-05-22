@@ -36,7 +36,7 @@ ALPHA_OFFSET_A2 = 52
     sta gREG::r6L
     lda #>msg_op_print_ret
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     lda #$80
     .byte $2c
@@ -52,7 +52,7 @@ ALPHA_OFFSET_A2 = 52
     sta gREG::r6L
     lda #>msg_op_print
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     lda zpu_pc
     sta zpu_mem
@@ -86,7 +86,7 @@ op_print_paddr:
     sta gREG::r6L
     lda #>msg_op_print_paddr
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Print the encoded string at the packed address in r0
     ldx operand_0
@@ -99,7 +99,7 @@ op_print_addr:
     sta gREG::r6L
     lda #>msg_op_print_addr
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Print the encoded string at the byte-address in r0
     ldx operand_0
@@ -122,7 +122,7 @@ print_addr_in_xya:
     sta gREG::r6L
     lda #>msg_op_new_line
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     lda #CH::ENTER
     sta operand_0+1
@@ -136,7 +136,7 @@ print_addr_in_xya:
     sta gREG::r6L
     lda #>msg_op_print_char
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Set the print window to the current window
     lda current_window
@@ -556,7 +556,7 @@ specchr_handler_shiftlock_down:
     sta gREG::r6L
     lda #>msg_op_print_num
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     lda current_window ; print to current window
     sec ; No leading zeroes

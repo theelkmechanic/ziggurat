@@ -250,5 +250,5 @@
 .define FONT_WIDTH 1
 .define FONT_HEIGHT 1
 
-.define DEFAULT_FG W_GREEN
+.define DEFAULT_FG W_LGREY
 .define DEFAULT_BG W_BLACK

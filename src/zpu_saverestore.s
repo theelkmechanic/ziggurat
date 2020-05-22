@@ -29,7 +29,7 @@ opext_save:
     sta gREG::r6L
     lda #>msg_restore_undo
     sta gREG::r6H
-    jsr printf
+;    jsr printf
     jmp fetch_and_dispatch
 .endproc
 
@@ -38,7 +38,7 @@ opext_save:
     sta gREG::r6L
     lda #>msg_save_undo
     sta gREG::r6H
-    jsr printf
+;    jsr printf
     jmp fetch_and_dispatch
 .endproc
 
@@ -48,7 +48,7 @@ opext_save:
     sta gREG::r6L
     lda #>msg_validating
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Since we're going to call op_je to do the branch, tell it that we have 2 large constant operands
     lda #$0f

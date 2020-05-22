@@ -32,7 +32,7 @@ remainder_sign = $402
 @print_it:
     sty gREG::r6L
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Fetch the variable
     lda operand_0+1
@@ -85,7 +85,7 @@ remainder_sign = $402
 @print_it:
     sty gREG::r6L
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Fetch the variable
     lda operand_0+1
@@ -118,7 +118,7 @@ remainder_sign = $402
     sta gREG::r6L
     lda #>msg_op_mul
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Figure out result sign and negate operands if we need to
     jsr init_muldiv_sign
@@ -168,7 +168,7 @@ remainder_sign = $402
     sta gREG::r6L
     lda #>msg_op_add
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Add params 0 and 1 into x/y
     lda operand_0+1
@@ -186,7 +186,7 @@ remainder_sign = $402
     sta gREG::r6L
     lda #>msg_op_sub
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Subtract param 1 from param 0 into x/y
     lda operand_0+1
@@ -204,7 +204,7 @@ remainder_sign = $402
     sta gREG::r6L
     lda #>msg_op_and
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; And params 0 and 1 into x/y
     lda operand_0
@@ -221,7 +221,7 @@ remainder_sign = $402
     sta gREG::r6L
     lda #>msg_op_or
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; And params 0 and 1 into x/y
     lda operand_0
@@ -242,7 +242,7 @@ op_not_v5:
     sta gREG::r6L
     lda #>msg_op_not
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Invert param 0 into x/y
     lda operand_0
@@ -288,7 +288,7 @@ store_math_var:
 @do_division:
     sty gREG::r6L
     stx gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Do the actual division operation
     jsr do_division
@@ -505,7 +505,7 @@ extend_bra_store_math_result:
     sta gREG::r6L
     lda #>msg_op_random
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Return our result
     jsr pc_fetch_and_advance
