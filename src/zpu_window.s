@@ -8,7 +8,7 @@
     sta gREG::r6L
     lda #>msg_op_show_status
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Only show for V1-3
     chkver V1|V2|V3,@show_status_is_nop
@@ -182,7 +182,7 @@
     sta gREG::r6L
     lda #>msg_op_buffer_mode
     sta gREG::r6H
-    jsr printf
+;    jsr printf
 
     ; Set buffer mode on main window
     lda window_main
@@ -303,36 +303,6 @@
     jsr pc_fetch_and_advance
     clc ; Push stack if necessary
     jsr store_varvalue
-    jmp fetch_and_dispatch
-.endproc
-
-.proc op_output_stream
-    jmp op_illegal
-
-    lda num_operands
-    cmp #1
-    bcs @check_for_1
-    lda #ERR_INVALID_PARAM
-    jmp print_error_and_exit
-
-@check_for_1:
-    beq @has_1
-    cmp #3
-    beq @has_2
-    ldy #<msg_op_output_stream_v6
-    ldx #>msg_op_output_stream_v6
-    bra @debug
-@has_2:
-    ldy #<msg_op_output_stream_v5
-    ldx #>msg_op_output_stream_v5
-    bra @debug
-@has_1:
-    ldy #<msg_op_output_stream_v3
-    ldx #>msg_op_output_stream_v3
-@debug:
-    sty gREG::r6L
-    stx gREG::r6H
-    jsr printf
     jmp fetch_and_dispatch
 .endproc
 
@@ -469,7 +439,7 @@
     ; Which window are we setting to?
     lda operand_0
     bne @done
-    lda operand_0
+    lda operand_0+1
     beq @setmain
     dec
     bne @done
@@ -568,10 +538,6 @@
     jmp @update_windows
 
 @do_split:
-    ; Make sure upper is current window
-    lda window_upper
-    sta current_window
-
     ; Upper height needs to get set to the param but not more than screen height
     lda operand_0
     beq @calcupperheight
@@ -741,9 +707,6 @@ msg_op_split_window:        .byte "Split window lines=@", CH::ENTER, 0
 msg_op_set_colour:          .byte "Set colour fg=@ bg=@", CH::ENTER, 0
 msg_op_set_colour_v6:       .byte "Set colour fg=@ bg=@ window=@", CH::ENTER, 0
 msg_op_buffer_mode:         .byte "Setting buffer mode @", CH::ENTER, 0
-msg_op_output_stream_v3:    .byte "Output stream @", CH::ENTER, 0
-msg_op_output_stream_v5:    .byte "Output stream @ table=@", CH::ENTER, 0
-msg_op_output_stream_v6:    .byte "Output stream @ table=@ width=@", CH::ENTER, 0
 msg_op_set_cursor:          .byte "Setting cursor line=@ col=@", CH::ENTER, 0
 msg_op_set_cursor_v6:       .byte "Setting cursor line=@ col=@ window=@", CH::ENTER, 0
 msg_op_get_cursor:          .byte "Getting cursor into @", CH::ENTER, 0
