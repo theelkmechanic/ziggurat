@@ -9,132 +9,72 @@
 .code
 
 ;
-; load_file_to_hiram - Load a file into high memory pages
+; load_file_to_hiram - Load a file into high memory pages (starting with bank 1)
 ;
 ; In:   r0          Pointer to filename
 ;       a           Filename length
 ;       x           Device #
-; Out:  a           Length of ZIF data loaded in 8K banks (0=failure)
 ;
 
 .proc load_file_to_hiram
-    ; Setup file load channel
-    pha
-    lda #1
-    ldy #1
-    jsr SETLFS
 
-    ; Set filename
-    pla
+    ; Set up write buffer ($A000 in bank 1)
+@write = gREG::r11
+@writeh = gREG::r11H
+    ldy #$a0
+    sty @writeh
+    ldy #0
+    sty @write
+    iny
+    sty VIA1::PRA
+
+    ; Set filename and load parameters
     ldx gREG::r0L
     ldy gREG::r0H
     jsr SETNAM
+    lda #1
+    ldx #8
+    ldy #$60
+    jsr SETLFS
 
-    ; Open the file for input
+    ; Open the file and set it for input
     jsr OPEN
+    bcs :+
     ldx #1
     jsr CHKIN
-    jsr READST
-    cmp #0
-    beq opened
-    sta gREG::r12L
-    lda #ERR_CANT_OPEN_FILE
-    jmp print_error_and_exit
-
-opened:
-    ; Set up high memory copy locations. We start loading in bank 1.
-baseaddr = gREG::r11
-bank  = gREG::r12L
-saved_bank = gREG::r12H
-block_len = gREG::r13L
-is_done  = gREG::r13H
-block_chk = gREG::r14L
-    ; r11 = base address in high memory bank slot
-    ; r12L = RAM bank
-    ; r12H = saved RAM bank
-    ; r13L = block length (0 = 256 bytes)
-    ; r13H = non-zero is done
-    ; r14L = block checksum
-    ldx #0
-    ldy #$a0
-    stx baseaddr
-    sty baseaddr+1
-    stx is_done
-    inx
-    stx bank
-
-    ; Loop reading 256-byte blocks into temp_buffer
-blkread:
-    ldy #0
-    sty block_chk
-readloop:
-    jsr CHRIN
-    tax
-    jsr READST
-    cmp #0
-    bne partial
-    txa
-    sta temp_buffer,y
-    clc
-    adc block_chk
-    sta block_chk
-    iny
-    bne readloop
-
-    ; Copy y bytes to next high memory block (0 = 256 bytes)
-
-    ; Start by saving the length to copy
-copytohigh:
-    sty block_len
-
-    ; Save and switch RAM bank
-    lda VIA1::PRA
-    sta saved_bank
-    lda bank
+    bcc @loadit
+@loaddone:
+    lda #1
     sta VIA1::PRA
+    jsr CLRCHN
+:   lda #1
+    jmp CLOSE
 
-    ; Copy the data (descending)
-copyblock:
-    dey
-    lda temp_buffer,y
-    sta (baseaddr),y
-    cpy #0
-    bne copyblock
+    ; Load the file into memory
+@loadit:
+    ldy #0
+@loadloop:
+    jsr CHRIN
+    pha
+    jsr READST
+    tax
+    pla
+    cpx #0
+    bne @loaddone
+    sta (@write),y
+    iny
+    bne @loadloop
 
-    ; Stop after the last block
-    cpy block_len
-    bne done
-
-    ; Step to next block, and once we hit $c000, skip back
-    ; to $a000 and increment the bank
-    ldx baseaddr+1
+    ; Every block we finish, step to the next block, and if we reach the end of the high ram window,
+    ; skip to the next bank and reset
+    ldx @writeh
     inx
     cpx #$c0
-    bne nextblock
+    bcc :+
+    ldx VIA1::PRA
+    inx
+    stx VIA1::PRA
     ldx #$a0
-    inc bank
-nextblock:
-    stx baseaddr+1
-
-    ; Switch the bank back
-    lda saved_bank
-    sta VIA1::PRA
-
-    ; And read the next block
-    jmp blkread
-
-    ; Partial block, if it's 0 bytes, we're done,
-    ; otherwise go back up and copy the partial
-partial:
-    lda #1
-    sta block_len
-    cpy #0
-    bne copytohigh
-
-    ; Close the file
-done:
-    jsr CLRCHN
-    lda #1
-    jsr CLOSE
-    rts
+:   stx @writeh
+    bra @loadloop
 .endproc

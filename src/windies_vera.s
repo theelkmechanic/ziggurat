@@ -29,18 +29,17 @@ blt_len:    .res 2
 @loadfont:
     lda #1
     ldx #8
-    ldy #1
+    ldy #2
     jsr SETLFS
     lda #zigfont_end-zigfont
     ldx #<zigfont
     ldy #>zigfont
     jsr SETNAM
-    jsr OPEN
-    ldx #1
-    jsr CHKIN
-    jsr READST
-    cmp #0
-    beq @opened
+    lda #2
+    ldx #0
+    ldy #$40
+    jsr LOAD
+    bcc @doneload
 @cantloadfont:
     ldx #0
 @2: lda cantloadfont,x
@@ -52,40 +51,7 @@ blt_len:    .res 2
     clc
     jmp RESTORE_BASIC
 
-@opened:
-    jsr CHRIN
-    tay
-    jsr READST
-    cmp #0
-    bne @cantloadfont
-    jsr CHRIN
-    tax
-    jsr READST
-    cmp #0
-    bne @cantloadfont
-    lda VERA::CTRL
-    and #$fe
-    sta VERA::CTRL
-    sty VERA::ADDR
-    stx VERA::ADDR+1
-    lda #$10
-    sta VERA::ADDR+2
-
-@readloop:
-    jsr CHRIN
-    tax
-    jsr READST
-    cmp #0
-    bne @doneload
-    stx VERA::DATA0
-    bra @readloop
-
 @doneload:
-    ; Close the file
-    jsr CLRCHN
-    lda #1
-    jsr CLOSE
-
     ; Configure the display compositor
     lda VERA::CTRL
     and #$fd
