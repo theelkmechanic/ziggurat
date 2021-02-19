@@ -609,7 +609,7 @@ maincode:
 .endproc
 
 versionstr: .byte $56, $65, $72, $73, $69, $6f, $6e, $20
-version:    .byte "0.0.7"
+version:    .byte "0.0.8"
             .byte 0
 
 azmachine:  .byte $41, $20, $5a, "-", $6d, $61, $63, $68, $69, $6e, $65, 0
