@@ -2,7 +2,7 @@
 .include "cbm_kernal.inc"
 .include "windies_impl.inc"
 
-.bss
+.data
 
 win_buffers: .res 80*3*4
 buf_off: .res 2

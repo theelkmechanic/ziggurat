@@ -7,7 +7,6 @@
 v_decode_paddr_r: .word decode_waddr ; default the decoders to v1-3
 v_decode_paddr_s: .word decode_waddr
 
-.bss
 offset_r_premul: .res 3
 offset_s_premul: .res 3
 retreat_save: .res 1

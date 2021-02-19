@@ -2,7 +2,7 @@
 .include "cbm_kernal.inc"
 .include "windies_impl.inc"
 
-.bss
+.data
 
 lines: .res 1
 cols: .res 1

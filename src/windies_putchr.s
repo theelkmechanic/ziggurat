@@ -2,7 +2,7 @@
 .include "cbm_kernal.inc"
 .include "windies_impl.inc"
 
-.bss
+.data
 
 putch_utf16: .res 2
 putch_flags: .res 1 ; $80 = advance after print, $40 = no buffering

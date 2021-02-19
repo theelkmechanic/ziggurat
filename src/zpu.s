@@ -23,7 +23,7 @@ operand_6: .res 2
 operand_7: .res 2
 atab_addr: .res 3
 
-.bss
+.data
 
 zpu_verflag: .res 1
 dict_base: .res 2

@@ -34,6 +34,7 @@
     jmp fetch_and_dispatch
 .endproc
 
+
 .rodata
 
 msg_op_output_stream:                   .byte "Output stream @", CH::ENTER, 0

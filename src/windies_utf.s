@@ -2,7 +2,7 @@
 .include "cbm_kernal.inc"
 .include "windies_impl.inc"
 
-.bss
+.data
 
 utf16: .res 2
 utf_xlat_addr: .res 3

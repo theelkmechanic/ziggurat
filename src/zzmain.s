@@ -6,6 +6,7 @@
 .segment "EXEHDR"
     ; Stub launcher
     .byte $0b, $08, $b0, $07, $9e, $32, $30, $36, $31, $00, $00, $00
+    jmp maincode
 
 titlewin = $803
 filewin = $804
@@ -19,7 +20,9 @@ fntoplineidx = $404
 curline = $405
 chunklen = $800
 
-.segment "LOWCODE"
+.data
+
+maincode:
     ; Initialize our windowing library
     lda #1
     sta BANK_RAM
@@ -604,8 +607,6 @@ chunklen = $800
     bne @skip_line
     bra @check_count
 .endproc
-
-.rodata
 
 versionstr: .byte $56, $65, $72, $73, $69, $6f, $6e, $20
 version:    .byte "0.0.7"

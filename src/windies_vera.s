@@ -2,7 +2,7 @@
 .include "cbm_kernal.inc"
 .include "windies_impl.inc"
 
-.bss
+.data
 
 blt_src:    .res 3
 blt_dst:    .res 3
