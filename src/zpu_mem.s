@@ -529,7 +529,7 @@ x2loop:
     sta zpu_pc+1
     inc zpu_pc+2
     lda zpu_pc+2
-    sta VIA1::PRA
+    sta BANK_RAM
     pla
 @skip:
     rts
@@ -585,7 +585,7 @@ mem_advance_finish:
     sta zpu_mem+1
     inc zpu_mem+2
     lda zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 mem_advance_skip:
     pla
     rts
@@ -640,7 +640,7 @@ mem2_advance_finish:
     sta zpu_mem_2+1
     inc zpu_mem_2+2
     lda zpu_mem_2+2
-    sta VIA1::PRA
+    sta BANK_RAM
 mem2_advance_skip:
     pla
     rts
@@ -693,7 +693,7 @@ mem2_advance_skip:
     sta zpu_mem+1
     dec zpu_mem+2
     lda zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 @mem_retreat_skip:
     lda retreat_save
     rts
@@ -715,7 +715,7 @@ mem2_advance_skip:
     sta zpu_mem_2+1
     dec zpu_mem_2+2
     lda zpu_mem_2+2
-    sta VIA1::PRA
+    sta BANK_RAM
 @mem_retreat_skip:
     lda retreat_save
     rts
@@ -1090,7 +1090,7 @@ mem2_advance_skip:
     bpl @justfilling
 
     ; When copying, load from zpu_mem and advance it
-    stx VIA1::PRA
+    stx BANK_RAM
     lda (zpu_mem)
     inc zpu_mem
     bne @copy_up_doneload
@@ -1107,7 +1107,7 @@ mem2_advance_skip:
     lda #0
 
     ; Now store the value to zpu_mem_2 and advance it
-    sty VIA1::PRA
+    sty BANK_RAM
     sta (zpu_mem_2)
     inc zpu_mem_2
     bne @copy_up_donestore
@@ -1163,7 +1163,7 @@ mem2_advance_skip:
     dec zpu_mem+2
     ldx zpu_mem+2
 @copy_down_doload:
-    stx VIA1::PRA
+    stx BANK_RAM
     lda (zpu_mem)
 
     ; Now decrement zpu_mem_2 and store the value to it
@@ -1183,7 +1183,7 @@ mem2_advance_skip:
     ldy zpu_mem_2+2
 @copy_down_dostore:
     pla
-    sty VIA1::PRA
+    sty BANK_RAM
     sta (zpu_mem_2)
 
     ; Decrement size and exit when we hit zero
@@ -1241,7 +1241,7 @@ mem2_advance_skip:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Scan for a matching value
 @scan_loop:
@@ -1287,7 +1287,7 @@ mem2_advance_skip:
     ; Store the return value in the result variable
     pha
     lda zpu_pc+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr pc_fetch_and_advance
     clc ; Push stack if necessary
     jsr store_varvalue

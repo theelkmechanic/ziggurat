@@ -271,7 +271,7 @@ print_addr_in_xya:
     sta zpu_mem_2+1
     lda atab_addr+2
     sta zpu_mem_2+2
-    sta VIA1::PRA
+    sta BANK_RAM
     pla
     jsr mem2_advance
     lda (zpu_mem_2)
@@ -360,7 +360,7 @@ print_addr_in_xya:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr mem_fetch_and_advance   ; Get the address of the actual abbreviation string
     tax
     lda (zpu_mem)
@@ -369,7 +369,7 @@ print_addr_in_xya:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr print_encoded_abbrev
 
     ; Restore the current string position and characters
@@ -516,9 +516,9 @@ print_zscii:
     sta zpu_mem_2+1
     lda utf_xlat_addr+2
     sta zpu_mem_2+2
-    ldx VIA1::PRA
+    ldx BANK_RAM
     phx
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; See if we have the specified character in our table
     jsr mem2_fetch_and_advance
@@ -541,7 +541,7 @@ print_zscii:
 @restore_bank:
     ; Restore previous bank
     pla
-    sta VIA1::PRA
+    sta BANK_RAM
     rts
 .endproc
 

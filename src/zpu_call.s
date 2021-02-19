@@ -69,7 +69,7 @@ ops_and_locals = $401
     sty zpu_pc
     stx zpu_pc+1
     sta zpu_pc+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Save the number of locals and number of operands into the parameter byte in our stack frame
     ; (which is at bp+5). Local count is in low nibble, operand count is in bits 6-4.
@@ -468,7 +468,7 @@ do_branch_flag = $402
 @switch_bank:
     sta zpu_pc+1
     lda zpu_pc+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; FALL THRU INTENTIONAL
     ; ***** DO NOT ADD CODE BETWEEN *****
@@ -570,7 +570,7 @@ do_branch_flag = $402
     ldx operand_0
     ldy operand_0+1
     lda zpu_pc+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr pc_fetch_and_advance
     sta operand_5
     clc ; Push to stack if necessary

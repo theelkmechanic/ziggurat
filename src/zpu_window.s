@@ -75,7 +75,7 @@
     ; Is this a score or a timed game?
     chkver V3,@show_score_or_time
     lda #1
-    sta VIA1::PRA
+    sta BANK_RAM
     lda ZMheader::flags
     and #F1V3_ISTIMED
     beq @show_score_or_time
@@ -238,7 +238,7 @@
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Get the cursor for the current window
     lda current_window

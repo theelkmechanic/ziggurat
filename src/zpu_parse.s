@@ -190,7 +190,7 @@ op_input_stream:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr mem_fetch_and_advance
     sta max_chars
     stz chars_typed
@@ -364,7 +364,7 @@ op_input_stream:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     lda #1
     jsr mem_advance
     lda chars_typed
@@ -393,7 +393,7 @@ op_input_stream:
     bit read_v5
     bpl @noresult
     lda zpu_pc+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr pc_fetch_and_advance
     ldx #0
     ldy term_char
@@ -434,7 +434,7 @@ op_input_stream:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr mem_fetch_and_advance
     sta max_words
     jsr mem_fetch_and_advance
@@ -452,7 +452,7 @@ op_input_stream:
 
     ; Copy the word information into the parse buffer
     lda zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     ldx #0
 @1: lda word_dict,x
     jsr mem_store_and_advance
@@ -472,7 +472,7 @@ op_input_stream:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr mem_fetch_and_advance
     lda words_typed
     jmp mem_store_and_advance
@@ -488,7 +488,7 @@ op_input_stream:
 ;       carry           - Set if word was successfully parsed
 .proc parse_word
     lda zpu_mem_2+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
 @trim_loop:
     ; Check if we still have characters
@@ -536,7 +536,7 @@ op_input_stream:
     cmp chars_typed
     bcs @have_whole_word
     lda zpu_mem_2+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr mem2_fetch_and_advance
     sta parse_char
     inc text_idx
@@ -566,7 +566,7 @@ op_input_stream:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Skip the separators
     jsr mem_fetch_and_advance
@@ -596,7 +596,7 @@ op_input_stream:
     sta zpu_mem+1
     lda memreg_save+2
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Return true that we parsed a word
     sec
@@ -612,7 +612,7 @@ op_input_stream:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Scan the word separators to see if this is one
     jsr mem_fetch_and_advance
@@ -640,7 +640,7 @@ op_input_stream:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr mem_fetch_and_advance
 
     ; Are we v5+?
@@ -1017,7 +1017,7 @@ op_input_stream:
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Now compare max_zchars bytes at encoded_buf to those at zpu_mem and return flags
     ldx #0

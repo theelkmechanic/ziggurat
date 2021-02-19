@@ -223,7 +223,7 @@ set_or_clear = $400
     ldx operand_1
     ldy operand_1+1
     jsr find_object
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Get the destination's current child (so it can be our new child's sibling)
     jsr get_child
@@ -239,7 +239,7 @@ set_or_clear = $400
     ; Now get our new child object
     jsr find_object
     lda zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Set the destination as its parent
     ldx operand_1
@@ -282,7 +282,7 @@ set_or_clear = $400
 .proc remove_object_from_parent
     ; Find the object (objnum in x/y)
     jsr find_object
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Get the object's current parent
     jsr get_parent
@@ -314,7 +314,7 @@ set_or_clear = $400
 @findparent:
     ldy operand_2+1
     jsr find_object
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Start with previous child as null
     stz operand_4
@@ -345,7 +345,7 @@ set_or_clear = $400
     stx operand_4
     sty operand_4+1
     jsr find_object
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr get_sibling
 
     ; If this is the old sibling, we're done
@@ -376,7 +376,7 @@ set_or_clear = $400
     beq @set_sibling_as_child_of_parent
     ldy operand_4+1
     jsr find_object
-    sta VIA1::PRA
+    sta BANK_RAM
     ldx operand_3
     ldy operand_3+1
     jmp set_sibling
@@ -432,7 +432,7 @@ set_or_clear = $400
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     lda operand_1+1
     dec
     asl
@@ -839,7 +839,7 @@ prop_not_found:
     lda (zpu_mem)
     tay
     jsr decode_baddr
-    sta VIA1::PRA
+    sta BANK_RAM
     sta zpu_mem+2
     stx zpu_mem+1
     sty zpu_mem

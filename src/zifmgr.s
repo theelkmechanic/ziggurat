@@ -26,7 +26,7 @@
     ldy #0
     sty @write
     iny
-    sty VIA1::PRA
+    sty BANK_RAM
 
     ; Set filename and load parameters
     ldx gREG::r0L
@@ -45,7 +45,7 @@
     bcc @loadit
 @loaddone:
     lda #1
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr CLRCHN
 :   lda #1
     jmp CLOSE
@@ -71,9 +71,9 @@
     inx
     cpx #$c0
     bcc :+
-    ldx VIA1::PRA
+    ldx BANK_RAM
     inx
-    stx VIA1::PRA
+    stx BANK_RAM
     ldx #$a0
 :   stx @writeh
     bra @loadloop

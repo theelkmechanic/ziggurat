@@ -22,7 +22,7 @@ chunklen = $800
 .segment "LOWCODE"
     ; Initialize our windowing library
     lda #1
-    sta VIA1::PRA
+    sta BANK_RAM
     jsr win_init
 
     ; Show title screen
@@ -223,7 +223,7 @@ chunklen = $800
     iny
     lda (gREG::r0),y
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     iny
     lda (gREG::r0),y
     sta fnlen
@@ -520,7 +520,7 @@ chunklen = $800
     sta zpu_mem+1
     lda #1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
     lda #>fnlist
     sta zpu_mem_2+1
     lda #<fnlist

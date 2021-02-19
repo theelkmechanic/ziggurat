@@ -59,7 +59,7 @@ printf_use_chrout: .res 1
     lda #50
     sta line_counter
     lda #1
-    sta VIA1::PRA
+    sta BANK_RAM
     ldx ZMheader::version
     beq @bad_version
     cpx #9
@@ -246,7 +246,7 @@ printf_use_chrout: .res 1
     sty zpu_mem
     stx zpu_mem+1
     sta zpu_mem+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     jsr mem_fetch_and_advance
     tax
@@ -486,7 +486,7 @@ printf_use_chrout: .res 1
 
     ; Make sure we're on the right RAM bank
     lda zpu_pc+2
-    sta VIA1::PRA
+    sta BANK_RAM
 
     ; Fetch and save the opcode
     jsr pc_fetch_and_advance

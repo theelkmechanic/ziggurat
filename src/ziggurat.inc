@@ -127,19 +127,27 @@ ERR_TODO                    = $0a
 
 ; Helper macros
 
+; For actual hardware
+;BANK_RAM = $00
+;BANK_ROM = $01
+
+; For r38 emulator
+BANK_RAM = VIA1::PRA
+BANK_ROM = VIA1::PRB
+
 .macro pushb bank
 .scope
-    lda VIA1::PRA
+    lda BANK_RAM
     pha
     lda bank
-    sta VIA1::PRA
+    sta BANK_RAM
 .endscope
 .endmacro
 
 .macro popb
 .scope
     pla
-    sta VIA1::PRA
+    sta BANK_RAM
 skip:
 .endscope
 .endmacro
