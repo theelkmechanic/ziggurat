@@ -30,6 +30,7 @@
 .global follow_branch
 .global print_encoded
 .global convert_zsciihigh_to_unicode
+.global print_zscii_to_table
 .global show_status
 .global negate_xy
 
@@ -238,6 +239,7 @@
 .global objentry_offset_sibling
 .global objentry_offset_child
 .global objentry_offset_propaddr
+.global ostream_flags
 .global window_main
 .global window_upper
 .global window_status

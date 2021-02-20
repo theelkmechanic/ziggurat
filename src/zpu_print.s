@@ -476,6 +476,14 @@ print_zscii:
     jsr z_isoutput
     bcc @done
 
+    ; Check if we're printing to a table instead
+    jsr print_zscii_to_table
+    bcs @done
+
+    ; Check if we're printing to the screen
+    bit ostream_flags
+    bvc @done
+
     ; Convert the ZSCII character in a to a UTF-16 character in x/y. Everything less than 128 matches Unicode.
     bit #$80
     bne @check_high

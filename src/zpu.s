@@ -1399,6 +1399,7 @@ error_msg_list:
     .word error_msg_illegal_extended
     .word error_msg_invalid_property
     .word error_msg_invalid_parse_char
+    .word error_msg_stream_overflow
     .word error_msg_todo
 
 hexchars:                       .byte   "0123456789abcdef"
@@ -1416,4 +1417,5 @@ error_msg_invalid_param:        .byte "Invalid parameters", 0
 error_msg_illegal_extended:     .byte "Illegal extended opcode #", 0
 error_msg_invalid_property:     .byte "Invalid property obj @ prop @", 0
 error_msg_invalid_parse_char:   .byte "Invalid character # in word while parsing", 0
+error_msg_stream_overflow:      .byte "Too many table streams opened", 0
 error_msg_todo:                 .byte "Unimplemented, TODO", 0

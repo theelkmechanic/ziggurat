@@ -123,7 +123,8 @@ ERR_INVALID_PARAM           = $06
 ERR_ILLEGAL_EXTENDED        = $07
 ERR_INVALID_PROPERTY        = $08
 ERR_INVALID_PARSE_CHAR      = $09
-ERR_TODO                    = $0a
+ERR_STREAM_OVERFLOW         = $0a
+ERR_TODO                    = $0b
 
 ; Helper macros
 
