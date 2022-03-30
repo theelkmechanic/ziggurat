@@ -29,7 +29,7 @@ blt_len:    .res 2
 @loadfont:
     lda #1
     ldx #8
-    ldy #2
+    ldy #0
     jsr SETLFS
     lda #zigfont_end-zigfont
     ldx #<zigfont

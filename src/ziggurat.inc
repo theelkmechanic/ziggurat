@@ -128,13 +128,13 @@ ERR_TODO                    = $0b
 
 ; Helper macros
 
-; For actual hardware
-;BANK_RAM = $00
-;BANK_ROM = $01
+; For r39 emulator and actual hardware
+BANK_RAM = $00
+BANK_ROM = $01
 
 ; For r38 emulator
-BANK_RAM = VIA1::PRA
-BANK_ROM = VIA1::PRB
+;BANK_RAM = VIA1::PRA
+;BANK_ROM = VIA1::PRB
 
 .macro pushb bank
 .scope
