@@ -1,624 +1,640 @@
 .include "ziggurat.inc"
 .include "zpu.inc"
 
-.import load_file_to_hiram
+.import load_file_to_hiram, __BSS_RUN__, __BSS_SIZE__
+
+.zeropage
+
+zpu_mem:    .res    3
+zpu_mem_2:  .res    3
 
 .segment "EXEHDR"
     ; Stub launcher
     .byte $0b, $08, $b0, $07, $9e, $32, $30, $36, $31, $00, $00, $00
     jmp maincode
 
-titlewin = $803
-filewin = $804
-loadwinwidth = $400
-fnlen = $401
-fnaddr = $402
-filename = $404
-fncount = $400
-fnlist = $414
-fntoplineidx = $404
-curline = $405
-chunklen = $800
+.segment "DISPOSE"
 
-.data
+need2mb:                jsr PRIMM
+                        .asciiz "need 2mb machine"
+                        jmp ENTER_BASIC
 
 maincode:
-    ; Initialize our windowing library
-    lda #1
-    sta BANK_RAM
-    jsr win_init
+                        ; Zero the BSS
+                        lda #<__BSS_RUN__
+                        sta gREG::r0L
+                        lda #>__BSS_RUN__
+                        sta gREG::r0H
+                        lda #<__BSS_SIZE__
+                        sta gREG::r1L
+                        lda #>__BSS_SIZE__
+                        sta gREG::r1H
+                        lda #0
+                        jsr MEMORY_FILL
 
-    ; Show title screen
-    ; Open a full-screen window
-    jsr win_open
-    sta titlewin
-    ldx #0
-    ldy #0
-    jsr win_setpos
-    jsr win_setcursor
-    jsr win_setwrap
-    ldx #80
-    ldy #30
-    jsr win_setsize
-    ldx #(W_WHITE << 4) + W_DGREY
-    jsr win_setcolor
-    jsr win_clear
-    jsr show_title
+                        ; Reserve the top 512KB of banked RAM (bail if not 2MB)
+                        sec
+                        jsr MEMTOP
+                        and #$ff
+                        bne need2mb
+                        sec
+                        sbc #64
+                        clc
+                        jsr MEMTOP
 
-    ; Show "Loading directory" message
-    ldx #>directory
-    ldy #<directory
-    lda #9
-    jsr show_loading
+                        ; Print "Loading font..." message
+                        ldx #0
+:                       lda loadingmsg,x
+                        beq :+
+                        jsr CHROUT
+                        inx
+                        bra :-
 
-    ; Load the directory into high memory
-    lda #>dollar
-    sta gREG::r0H
-    lda #<dollar
-    sta gREG::r0L
-    lda #1
-    ldx #8
-    jsr load_file_to_hiram
+                        ; Set font name in r0 and length/device in r1
+:                       lda #zigfont_end-zigfont
+                        sta gREG::r1L
+                        lda #8
+                        sta gREG::r1H
+                        lda #<zigfont
+                        sta gREG::r0L
+                        lda #>zigfont
+                        sta gREG::r0H
 
-    ; Save the addresses/lengths of all our filenames
-    jsr parse_filenames
+                        ; Use white on dark grey by default
+                        ldx #ULCOLOR::WHITE
+                        stx gREG::r2L
+                        ldy #ULCOLOR::DGREY
+                        sty gREG::r2H
+                        jsr ulwin_errorcfg
 
-    ; Close the loading message and repaint the title
-    lda filewin
-    jsr win_close
-    jsr show_title
+                        ; Initialize the Unilib library
+                        jsr ul_init
 
-    ; Open the file picker window
-    jsr win_open
-    sta filewin
-    ldx #56
-    ldy #10
-    jsr win_setpos
-    ldx #0
-    ldy #0
-    jsr win_setcursor
-    jsr win_setwrap
-    ldx #20
-    ldy #18
-    jsr win_setsize
-    ldx #(W_DGREY << 4) + W_WHITE
-    jsr win_setcolor
-    jsr win_clear
-    jsr boxfilewin
-    lda filewin
-    ldx #2
-    ldy #0
-    jsr win_setcursor
-    ldx #>choose
-    ldy #<choose
-    jsr printxy
-    lda filewin
-    jsr win_getpos
-    inx
-    iny
-    jsr win_setpos
-    jsr win_getsize
-    dex
-    dex
-    dey
-    dey
-    jsr win_setsize
+                        ; Show title screen
+                        ; Open a full-screen window
+                        stz gREG::r0L
+                        stz gREG::r0H
+                        stz gREG::r3L
+                        stz gREG::r3H
+                        stz gREG::r4H
+                        lda #80
+                        sta gREG::r1L
+                        lda #30
+                        sta gREG::r1H
+                        lda #ULCOLOR::DGREY
+                        sta gREG::r2L
+                        lda #ULCOLOR::WHITE
+                        sta gREG::r2H
+                        jsr ulwin_open
+                        sta titlewin
 
-    ; Choose the file to load
-    jsr choose_file
+                        ; Paint the title screen into it
+                        jsr show_title
 
-    ; Close the file picker window, repaint the title screen
-    lda filewin
-    jsr win_close
-    jsr show_title
+                        ; Show "Loading directory" message
+                        ldx #<directory
+                        ldy #>directory
+                        jsr show_loading
+                        jsr ulwin_refresh
 
-    ; Show "Loading filename" message
-    lda fnlen
-    ldx #>filename
-    ldy #<filename
-    jsr show_loading
+                        ; Load the directory into high memory
+                        lda #<dollar
+                        sta gREG::r0L
+                        lda #>dollar
+                        sta gREG::r0H
+                        lda #1
+                        ldx #8
+                        jsr load_file_to_hiram
 
-    ; Load the ZIF file
-    lda #>filename
-    sta gREG::r0H
-    lda #<filename
-    sta gREG::r0L
-    lda fnlen
-    ldx #8
-    jsr load_file_to_hiram
+                        ; Save the addresses/lengths of all our filenames
+                        jsr parse_filenames
 
-    ; Close our windows
-    lda filewin
-    jsr win_close
-    lda titlewin
-    jsr win_close
+                        ; Close the loading message and repaint the title
+                        lda filewin
+                        jsr ulwin_close
 
-    ; Start the ZPU
-    jmp zpu_start
+                        ; Open the file picker window
+                        lda #57
+                        sta gREG::r0L
+                        lda #11
+                        sta gREG::r0H
+                        lda #18
+                        sta gREG::r1L
+                        lda #16
+                        sta gREG::r1H
+                        lda #ULCOLOR::WHITE
+                        sta gREG::r2L
+                        lda #ULCOLOR::DGREY
+                        sta gREG::r2H
+                        ldx #<choose
+                        ldy #>choose
+                        jsr ulstr_fromUtf8
+                        stx gREG::r3L
+                        sty gREG::r3H
+                        lda #ULWIN_FLAGS::BORDER
+                        sta gREG::r4H
+                        jsr ulwin_open
+                        sta filewin
+                        jsr ulwin_refresh
+
+                        ; Choose the file to load
+                        jsr choose_file
+
+                        ; Close the file picker window, repaint the title screen
+                        lda filewin
+                        jsr ulwin_close
+
+                        ; Show "Loading filename" message
+                        lda fnlen
+                        ldx #<filename
+                        ldy #>filename
+                        jsr show_loading
+
+                        ; Load the ZIF file
+                        lda #<filename
+                        sta gREG::r0L
+                        lda #>filename
+                        sta gREG::r0H
+                        lda fnlen
+                        ldx #8
+                        jsr load_file_to_hiram
+
+                        ; Close our windows
+                        lda filewin
+                        jsr ulwin_close
+                        lda titlewin
+                        jsr ulwin_close
+
+@loop: bra @loop
+
+                        ; Start the ZPU
+;                        jmp zpu_start
 
 .proc show_title
-    ; Use zpu_mem because it's easier to scan with
-    lda #<zigtitle
-    sta zpu_mem
-    lda #>zigtitle
-    sta zpu_mem+1
-    lda #1
-    sta zpu_mem+2
+                        ; Use zpu_mem because it's easier to scan with
+                        lda #<zigtitle
+                        sta zpu_mem
+                        lda #>zigtitle
+                        sta zpu_mem+1
+                        lda #1
+                        sta zpu_mem+2
 
 @draw_chunk:
-    ; Read start x/y and move cursor
-    jsr mem_fetch_and_advance
-    cmp #$ff
-    bne @goodchunk
+                        ; Read start x/y and move cursor
+                        jsr mem_fetch_and_advance
+                        bpl @goodchunk
 
-    ; Draw title texts
-    lda titlewin
-    ldx #23
-    ldy #16
-    jsr win_setcursor
-    ldx #>azmachine
-    ldy #<azmachine
-    jsr printxy
-    ldx #23
-    ldy #17
-    jsr win_setcursor
-    ldx #>forthex16
-    ldy #<forthex16
-    jsr printxy
-    ldx #1
-    ldy #28
-    jsr win_setcursor
-    ldx #>versionstr
-    ldy #<versionstr
-    jmp printxy
+                        ; Draw title texts
+                        lda titlewin
+                        ldx #23
+                        ldy #16
+                        jsr ulwin_putcursor
+                        ldx #<azmachine
+                        ldy #>azmachine
+                        jsr printit
+                        ldx #23
+                        ldy #17
+                        jsr ulwin_putcursor
+                        ldx #<forthex16
+                        ldy #>forthex16
+                        jsr printit
+                        ldx #1
+                        ldy #28
+                        jsr ulwin_putcursor
+                        ldx #<versionstr
+                        ldy #>versionstr
+                        jmp printit
 
 @goodchunk:
-    ; Draw a chunk of graphics
-    tax
-    jsr mem_fetch_and_advance
-    tay
-    lda titlewin
-    jsr win_setcursor
+                        ; Set the cursor position for this chunk
+                        tax
+                        jsr mem_fetch_and_advance
+                        tay
+                        lda titlewin
+                        jsr ulwin_putcursor
 
-    ; Read length
-    jsr mem_fetch_and_advance
-    sta chunklen
+                        ; Read length
+                        jsr mem_fetch_and_advance
+                        sta chunklen
 
-    ; Draw block characters
+                        ; Draw block characters
 @draw_next:
-    jsr mem_fetch_and_advance
-    tax
-    lda zigbits,x
-    tay
-    bpl @notblock
-    ldx #$25
-    .byte $2c
+                        jsr mem_fetch_and_advance
+                        tay
+                        lda zigbits,y
+                        tax
+                        bpl @notblock
+                        ldy #$25
+                        .byte $2c
 @notblock:
-    ldx #0
-    lda titlewin
-    sec
-    jsr win_putchr
-    dec chunklen
-    bne @draw_next
-    bra @draw_chunk
+                        ldy #0
+                        stx gREG::r0L
+                        sty gREG::r0H
+                        stz gREG::r1L
+                        lda titlewin
+                        jsr ulwin_putchar
+                        dec chunklen
+                        bne @draw_next
+                        bra @draw_chunk
 .endproc
 
-.proc find_fname_addr
-    phy
-    sta gREG::r0L
-    stz gREG::r0H
-    asl gREG::r0L
-    rol gREG::r0H
-    asl gREG::r0L
-    rol gREG::r0H
-    lda #<fnlist
-    clc
-    adc gREG::r0L
-    sta gREG::r0L
-    lda #>fnlist
-    adc gREG::r0H
-    sta gREG::r0H
-    ldy #1
-    lda (gREG::r0)
-    sta zpu_mem
-    lda (gREG::r0),y
-    sta zpu_mem+1
-    iny
-    lda (gREG::r0),y
-    sta zpu_mem+2
-    sta BANK_RAM
-    iny
-    lda (gREG::r0),y
-    sta fnlen
-    ply
-    rts
+.proc find_fname_brp
+                        tya
+                        clc
+                        adc fntoplineidx
+                        asl
+                        tax
+                        lda #0
+                        rol
+                        tay
+                        txa
+                        clc
+                        adc #<fnlist
+                        sta gREG::r0L
+                        tya
+                        adc #>fnlist
+                        sta gREG::r0H
+                        ldy #1
+                        lda (gREG::r0)
+                        tax
+                        lda (gREG::r0),y
+                        sta gREG::r0H
+                        stx gREG::r0L
+                        rts
 .endproc
 
 .proc update_yline
-    ; Check if fntoplineidx + y < count
-    phy
-    tya
-    clc
-    adc fntoplineidx
-    cmp fncount
-    bcs @done
+                        ; Pick colors based on current selection
+                        phy
+                        cpy curline
+                        bne :+
+                        ldx #ULCOLOR::BLACK
+                        ldy #ULCOLOR::WHITE
+                        bra :++
+:                       ldx #ULCOLOR::WHITE
+                        ldy #ULCOLOR::DGREY
+:                       clc
+                        lda filewin
+                        jsr ulwin_putcolor
 
-    ; Okay, line should be a valid filename, so find it and print it
-    jsr find_fname_addr
+                        ; Erase the line and draw the string one space over
+                        ldx #0
+                        ply
+                        phy
+                        jsr ulwin_putcursor
+                        jsr ulwin_eraseeol
+                        inx
+                        jsr ulwin_putcursor
 
-    ; Is this the current line
-    lda filewin
-    ldx #0
-    jsr win_setcursor
-    cpy curline
-    beq @iscurrent
-    ldy #' '
-    .byte $2c
-@iscurrent:
-    ldy #34
-    ldx #$e0
-    sec
-    jsr win_putchr
-
-    ; Print the filename followed by enough spaces to clear the remainder of the line
-    stz gREG::r0
-    ldx #0
-@printloop:
-    lda gREG::r0
-    cmp #16
-    bcs @done
-    cmp fnlen
-    bcs @usespace
-    jsr mem_fetch_and_advance
-    .byte $2c
-@usespace:
-    lda #' '
-    tay
-    lda filewin
-    sec
-    jsr win_putchr
-    inc gREG::r0
-    bra @printloop
-
-@done:
-    ply
-    rts
+                        ; Get the correct filename from the list and draw it
+                        jsr find_fname_brp
+                        lda filewin
+                        jsr ulwin_putstr
+                        ply
+                        rts
 .endproc
 
 .proc choose_file
-    ; Show first (up to) 16 filenames
-    lda filewin
-    jsr win_clear
-    ldx #0
-    ldy #0
-    jsr win_setcursor
-    stz fntoplineidx
-    stz curline
-    ldy #15
-@1: jsr update_yline
-    dey
-    bpl @1
+                        ; Show first (up to) 16 filenames
+                        stz fntoplineidx
+                        stz curline
+                        ldy fncount
+                        dey
+                        cpy #15
+                        bcc @1
+                        ldy #15
+@1:                     jsr update_yline
+                        dey
+                        bpl @1
+@refresh:               jsr ulwin_refresh
 
 @keys:
-    jsr GETIN
-    cmp #17
-    beq @cursordown
-    cmp #145
-    beq @cursorup
-    cmp #13
-    beq @selected
-    bra @keys
+                        jsr GETIN
+                        cmp #17
+                        beq @cursordown
+                        cmp #145
+                        beq @cursorup
+                        cmp #13
+                        beq @selected
+                        bra @keys
 
 @cursorup:
-    ; Check if we're at the top
-    lda curline
-    beq @atthetop
-    dec curline
-    tay
-    jsr update_yline
-    dey
-    jsr update_yline
-    bra @keys
+                        ; Check if we're at the top
+                        lda curline
+                        beq @atthetop
+                        dec curline
+                        tay
+                        jsr update_yline
+                        dey
+                        jsr update_yline
+                        bra @refresh
 
 @atthetop:
-    ; Can we scroll more names into view?
-    lda fntoplineidx
-    beq @keys
-    lda filewin
-    jsr win_scrolldown
-    dec fntoplineidx
-    ldy #0
-    jsr update_yline
-    iny
-    jsr update_yline
-    bra @keys
+                        ; Can we scroll more names into view?
+                        lda fntoplineidx
+                        beq @keys
+                        lda filewin
+                        ldx #0
+                        ldy #1
+                        jsr ulwin_scroll
+                        dec fntoplineidx
+                        ldy #0
+                        jsr update_yline
+                        iny
+                        jsr update_yline
+                        bra @refresh
 
 @cursordown:
-    ; Check if we're at the end of the file list
-    lda fntoplineidx
-    clc
-    adc curline
-    inc
-    cmp fncount
-    bcs @keys
+                        ; Check if we're at the end of the file list
+                        lda fntoplineidx
+                        clc
+                        adc curline
+                        inc
+                        cmp fncount
+                        bcs @keys
 
-    ; We can move down, are we at the last line
-    lda curline
-    cmp #15
-    bcs @atthebottom
-    inc curline
-    tay
-    jsr update_yline
-    iny
-    jsr update_yline
-    bra @keys
+                        ; We can move down, are we at the last line
+                        lda curline
+                        cmp #15
+                        bcs @atthebottom
+                        inc curline
+                        tay
+                        jsr update_yline
+                        iny
+                        jsr update_yline
+                        bra @refresh
 
 @atthebottom:
-    ; Scroll another name into view
-    lda filewin
-    jsr win_scroll
-    inc fntoplineidx
-    ldy curline
-    jsr update_yline
-    dey
-    jsr update_yline
-    bra @keys
+                        ; Scroll another name into view
+                        lda filewin
+                        ldx #0
+                        ldy #$ff
+                        jsr ulwin_scroll
+                        inc fntoplineidx
+                        ldy curline
+                        jsr update_yline
+                        dey
+                        jsr update_yline
+                        bra @refresh
 
 @selected:
-    lda fntoplineidx
-    clc
-    adc curline
-    jsr find_fname_addr
-    lda #>filename
-    sta gREG::r0H
-    lda #<filename
-    sta gREG::r0L
-    ldy #0
-@2: jsr mem_fetch_and_advance
-    sta (gREG::r0),y
-    iny
-    cpy fnlen
-    bcc @2
-    lda #0
-    sta (gREG::r0),y
-    rts
+                        lda fntoplineidx
+                        clc
+                        adc curline
+                        jsr find_fname_brp
+                        lda #>filename
+                        sta gREG::r0H
+                        lda #<filename
+                        sta gREG::r0L
+                        ldy #0
+@2:                     jsr mem_fetch_and_advance
+                        sta (gREG::r0),y
+                        iny
+                        cpy fnlen
+                        bcc @2
+                        lda #0
+                        sta (gREG::r0),y
+                        rts
 .endproc
 
-.proc boxfilewin
-    lda filewin
-    jsr win_getsize
-    txa
-    dec
-    sta gREG::r7H
-    dec
-    sta gREG::r6L
-    sta gREG::r6H
-    tya
-    dec
-    dec
-    sta gREG::r7L
-    lda filewin
-    ldx #0
-    ldy #0
-    jsr win_setcursor
-    ldx #$e0
-    ldy #47
-    sec
-    jsr win_putchr
-    ldy #39
-@1: dec gREG::r6L
-    bmi @2
-    sec
-    jsr win_putchr
-    bra @1
-@2: ldy #48
-    sec
-    jsr win_putchr
-    ldx #0
-    ldy #13
-    sec
-    jsr win_putchr
-@3: dec gREG::r7L
-    bmi @4
-    ldx #$e0
-    ldy #41
-    sec
-    jsr win_putchr
-    jsr win_getcursor
-    ldx gREG::r7H
-    jsr win_setcursor
-    ldx #$e0
-    ldy #40
-    sec
-    jsr win_putchr
-    ldx #0
-    ldy #13
-    sec
-    jsr win_putchr
-    bra @3
-@4: ldx #$e0
-    ldy #46
-    sec
-    jsr win_putchr
-    ldy #38
-@5: dec gREG::r6H
-    bmi @6
-    sec
-    jsr win_putchr
-    bra @5
-@6: ldy #49
-    sec
-    jsr win_putchr
-    rts
-.endproc
-
-.proc printxy
-    sta gREG::r1
-    stx gREG::r0H
-    sty gREG::r0L
-    ldy #0
-@1: lda (gREG::r0),y
-    beq @2
-    phy
-    tay
-    ldx #0
-    lda gREG::r1
-    sec
-    jsr win_putchr
-    ply
-    iny
-    bne @1
-@2: ldx gREG::r0H
-    ldy gREG::r0L
-    lda gREG::r1
-    rts
+.proc printit
+                        stz gREG::r1L
+                        stz gREG::r0H
+                        stx zpu_mem
+                        sty zpu_mem+1
+                        sta zpu_mem_2
+:                       jsr mem_fetch_and_advance
+                        beq :+
+                        sta gREG::r0L
+                        lda zpu_mem_2
+                        sec
+                        jsr ulwin_putchar
+                        bra :-
+:                       lda zpu_mem_2
+                        rts
 .endproc
 
 .proc show_loading
-    sta fnlen
-    stx fnaddr+1
-    sty fnaddr
-    jsr win_open
-    sta filewin
-    lda fnlen
-    clc
-    adc #15
-    sta loadwinwidth
-    lda #76
-    sec
-    sbc loadwinwidth
-    tax
-    lda filewin
-    ldy #25
-    jsr win_setpos
-    ldx #0
-    ldy #0
-    jsr win_setcursor
-    jsr win_setwrap
-    ldx loadwinwidth
-    ldy #3
-    jsr win_setsize
-    ldx #(W_DGREY << 4) + W_WHITE
-    jsr win_setcolor
-    jsr win_clear
-    jsr boxfilewin
-    lda filewin
-    ldx #2
-    ldy #1
-    jsr win_setcursor
-    ldx #>loading
-    ldy #<loading
-    jsr printxy
-    ldx fnaddr+1
-    ldy fnaddr
-    jsr printxy
-    ldx #>threedots
-    ldy #<threedots
-    jmp printxy
+                        jsr ulstr_fromUtf8
+                        stx fnaddr
+                        sty fnaddr+1
+                        jsr ulstr_getprintlen
+                        sta fnlen
+                        clc
+                        adc #13
+                        sta gREG::r1L
+                        lda #76
+                        sec
+                        sbc gREG::r1L
+                        sta gREG::r0L
+                        lda #27
+                        sta gREG::r0H
+                        lda #1
+                        sta gREG::r1H
+                        lda #ULCOLOR::WHITE
+                        sta gREG::r2L
+                        lda #ULCOLOR::DGREY
+                        sta gREG::r2H
+                        stz gREG::r3L
+                        stz gREG::r3H
+                        lda #ULWIN_FLAGS::BORDER
+                        sta gREG::r4H
+                        jsr ulwin_open
+                        sta filewin
+                        ldx #1
+                        ldy #0
+                        jsr ulwin_putcursor
+                        ldx #<loading
+                        ldy #>loading
+                        jsr printit
+                        lda fnaddr
+                        sta gREG::r0L
+                        lda fnaddr+1
+                        sta gREG::r0H
+                        lda filewin
+                        clc
+                        jsr ulwin_putstr
+                        ldx #<threedots
+                        ldy #>threedots
+                        lda filewin
+                        jmp printit
 .endproc
 
 .proc parse_filenames
-    stz zpu_mem
-    lda #$a0
-    sta zpu_mem+1
-    lda #1
-    sta zpu_mem+2
-    sta BANK_RAM
-    lda #>fnlist
-    sta zpu_mem_2+1
-    lda #<fnlist
-    sta zpu_mem_2
-    stz fncount
+                        stz zpu_mem
+                        lda #$a0
+                        sta zpu_mem+1
+                        lda #192
+                        sta zpu_mem+2
+                        sta BANKSEL::RAM
+                        lda #<fnlist
+                        sta zpu_mem_2
+                        lda #>fnlist
+                        sta zpu_mem_2+1
+                        stz fncount
 
-    ; Skip program address
-    lda #2
-    jsr mem_advance
+                        ; Skip program address
+                        lda #2
+                        jsr mem_advance
 
 @check_count:
-    ; Bail at 250 files since we don't have room for more
-    lda fncount
-    cmp #250
-    bcc @check_line
+                        ; Bail at 250 files since we don't have room for more
+                        lda fncount
+                        cmp #250
+                        bcc @check_line
 @done:
-    ; Finished parsing directory
-    rts
+                        ; Finished parsing directory
+                        rts
 
 @check_line:
-    ; Check if this is a line
-    jsr mem_fetch_and_advance
-    tax
-    jsr mem_fetch_and_advance
-    bne @check_size
-    cpx #0
-    beq @done
+                        ; Check if this is a line
+                        jsr mem_fetch_and_advance
+                        tax
+                        jsr mem_fetch_and_advance
+                        bne @check_size
+                        cpx #0
+                        beq @done
 
 @check_size:
-    ; Skip zero-block files
-    jsr mem_fetch_and_advance
-    tax
-    jsr mem_fetch_and_advance
-    bne @find_name
-    cpx #0
-    beq @skip_line
+                        ; Skip zero-block files
+                        jsr mem_fetch_and_advance
+                        tax
+                        jsr mem_fetch_and_advance
+                        bne @find_name
+                        cpx #0
+                        beq @skip_line
 
 @find_name:
-    ; Find the first doublequote (if we hit a NUL, we're at the end of the directory)
-    jsr mem_fetch_and_advance
-    beq @done
-    cmp #$22
-    bne @find_name
+                        ; Find the first doublequote (if we hit a NUL, we're at the end of the directory)
+                        jsr mem_fetch_and_advance
+                        beq @done
+                        cmp #$22
+                        bne @find_name
 
-    ; Save the address of the filename
-    ldy #1
-    lda zpu_mem
-    sta (zpu_mem_2)
-    lda zpu_mem+1
-    sta (zpu_mem_2),y
-    iny
-    lda zpu_mem+2
-    sta (zpu_mem_2),y
-    ldx #0
-
+                        ; Copy the filename to low memory
+                        ldx #0
 @find_name_end:
-    ; Find the second doublequote
-    jsr mem_fetch_and_advance
-    cmp #$22
-    beq @found_end
-    inx
-    bra @find_name_end
-@found_end:
-    txa
-    ldy #3
-    sta (zpu_mem_2),y
+                        ; Find the second doublequote
+                        jsr mem_fetch_and_advance
+                        cmp #$22
+                        beq @found_end
+                        sta $400,x
+                        inx
+                        bra @find_name_end
 
-    ; Advance the fnlist pointer to the next entry
-    inc fncount
-    lda zpu_mem_2
-    clc
-    adc #4
-    sta zpu_mem_2
-    lda zpu_mem_2+1
-    adc #0
-    sta zpu_mem_2+1
+                        ; NUL-terminate, turn into a string, and save to our list
+@found_end:
+                        stz $400,x
+                        ldx #0
+                        ldy #4
+                        jsr ulstr_fromUtf8
+                        txa
+                        jsr mem2_store_and_advance
+                        tya
+                        jsr mem2_store_and_advance
+                        inc fncount
 
 @skip_line:
-    ; Find the end of the line
-    jsr mem_fetch_and_advance
-    bne @skip_line
-    bra @check_count
+                        ; Find the end of the line
+                        lda zpu_mem+2
+                        sta BANKSEL::RAM
+                        jsr mem_fetch_and_advance
+                        bne @skip_line
+                        bra @check_count
 .endproc
 
-versionstr: .byte $56, $65, $72, $73, $69, $6f, $6e, $20
-version:    .byte "0.0.8"
-            .byte 0
+.proc mem_fetch_and_advance
+    lda (zpu_mem)
+    pha
+    inc zpu_mem
+    beq mem_advance_finish
+    pla
+    rts
+.endproc
 
-azmachine:  .byte $41, $20, $5a, "-", $6d, $61, $63, $68, $69, $6e, $65, 0
-forthex16:  .byte $66, $6f, $72, $20, $74, $68, $65, $20, $58, "-16!", 0
-loading:    .byte $4c, $6f, $61, $64, $69, $6e, $67, $20, 0
-directory:  .byte $64, $69, $72, $65, $63, $74, $6f, $72, $79, 0
-threedots:  .byte "...", 0
+.proc mem_advance
+    pha
+    clc
+    adc zpu_mem
+    sta zpu_mem
+    bcc mem_advance_skip
+
+    ; FALL THRU INTENTIONAL
+.endproc
+
+mem_advance_finish:
+    inc zpu_mem+1
+    lda zpu_mem+1
+    cmp #$c0
+    bcc mem_advance_skip
+    lda #$a0
+    sta zpu_mem+1
+    inc zpu_mem+2
+    lda zpu_mem+2
+    sta BANKSEL::RAM
+mem_advance_skip:
+    pla
+    rts
+
+.proc mem2_store_and_advance
+    sta (zpu_mem_2)
+    pha
+    inc zpu_mem_2
+    beq mem2_advance_finish
+    pla
+    rts
+.endproc
+
+.proc mem2_advance
+    pha
+    clc
+    adc zpu_mem_2
+    sta zpu_mem_2
+    bcc mem2_advance_skip
+
+    ; FALL THRU INTENTIONAL
+.endproc
+
+mem2_advance_finish:
+    inc zpu_mem_2+1
+    lda zpu_mem_2+1
+    cmp #$c0
+    bcc mem2_advance_skip
+    lda #$a0
+    sta zpu_mem_2+1
+    inc zpu_mem_2+2
+    lda zpu_mem_2+2
+    sta BANKSEL::RAM
+mem2_advance_skip:
+    pla
+    rts
+
+loadingmsg:     .byte "LOADING "
+zigfont:        .byte "ZIGGURAT.FNT"
+zigfont_end:    .byte "...", 0
+cantloadfont:   .byte "ERROR LOADING FONT!", CH::ENTER, 0
+
+versionstr: .asciiz "Version 0.1.0"
+
+azmachine:  .asciiz "A Z-Machine"
+forthex16:  .asciiz "for the X-16!"
+loading:    .asciiz "Loading "
+directory:  .asciiz "directory"
+threedots:  .asciiz "..."
 dollar:     .byte "$"
-choose:     .byte $43, $68, $6f, $6f, $73, $65, $20, $67, $61, $6d, $65, $3a, 0
+choose:     .asciiz "Choose game:"
+
+titlewin:       .res    1
+filewin:        .res    1
+loadwinwidth:   .res    1
+fnlen:          .res    1
+fnaddr:         .res    2
+filename:       .res    2
+fncount:        .res    1
+fntoplineidx:   .res    1
+curline:        .res    1
+chunklen:       .res    1
+fnlist:
 
 zigbits:    .byte $20, $97, $96, $84, $9d, $90, $9e, $9f, $98, $9a, $8c, $99, $80, $9c, $9b, $88
 

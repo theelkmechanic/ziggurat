@@ -59,7 +59,7 @@ printf_use_chrout: .res 1
     lda #50
     sta line_counter
     lda #1
-    sta BANK_RAM
+    sta BANKSEL::RAM
     ldx ZMheader::version
     beq @bad_version
     cpx #9

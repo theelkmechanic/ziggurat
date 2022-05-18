@@ -2,8 +2,7 @@
 
 .include "cx16.inc"
 .include "cbm_kernal.inc"
-
-.include "windies.inc"
+.include "unilib.inc"
 
 ; We can use $0400-$07ff as 1k of temporary buffer for loading/saving/etc.
 temp_buffer = $0400
@@ -128,27 +127,19 @@ ERR_TODO                    = $0b
 
 ; Helper macros
 
-; For r39 emulator and actual hardware
-BANK_RAM = $00
-BANK_ROM = $01
-
-; For r38 emulator
-;BANK_RAM = VIA1::PRA
-;BANK_ROM = VIA1::PRB
-
 .macro pushb bank
 .scope
-    lda BANK_RAM
+    lda BANKSEL::RAM
     pha
     lda bank
-    sta BANK_RAM
+    sta BANKSEL::RAM
 .endscope
 .endmacro
 
 .macro popb
 .scope
     pla
-    sta BANK_RAM
+    sta BANKSEL::RAM
 skip:
 .endscope
 .endmacro

@@ -713,3 +713,79 @@ msg_op_get_cursor:          .byte "Getting cursor into @", CH::ENTER, 0
 msg_opext_set_font:         .byte "Setting font @", CH::ENTER, 0
 msg_opext_set_font_v6:      .byte "Setting font @ window=@", CH::ENTER, 0
 msg_op_show_status:         .byte "Show status", CH::ENTER, 0
+
+utf_xlat_default:
+    .byte 69    ; Number of Unicode characters in the table (2 bytes each, big-endian)
+    .dbyt $00e4
+    .dbyt $00f6
+    .dbyt $00fc
+    .dbyt $00c4
+    .dbyt $00d6
+    .dbyt $00dc
+    .dbyt $00df
+    .dbyt $00bb
+    .dbyt $00ab
+    .dbyt $00eb
+    .dbyt $00ef
+    .dbyt $00ff
+    .dbyt $00cb
+    .dbyt $00cf
+    .dbyt $00e1
+    .dbyt $00e9
+    .dbyt $00ed
+    .dbyt $00f3
+    .dbyt $00fa
+    .dbyt $00fd
+    .dbyt $00c1
+    .dbyt $00c9
+    .dbyt $00cd
+    .dbyt $00d3
+    .dbyt $00da
+    .dbyt $00dd
+    .dbyt $00e0
+    .dbyt $00e8
+    .dbyt $00ec
+    .dbyt $00f2
+    .dbyt $00f9
+    .dbyt $00c0
+    .dbyt $00c8
+    .dbyt $00cc
+    .dbyt $00d2
+    .dbyt $00d9
+    .dbyt $00e2
+    .dbyt $00ea
+    .dbyt $00ee
+    .dbyt $00f4
+    .dbyt $00fb
+    .dbyt $00c2
+    .dbyt $00ca
+    .dbyt $00ce
+    .dbyt $00d4
+    .dbyt $00db
+    .dbyt $00e5
+    .dbyt $00c5
+    .dbyt $00f8
+    .dbyt $00d8
+    .dbyt $00e3
+    .dbyt $00f1
+    .dbyt $00f5
+    .dbyt $00c3
+    .dbyt $00d1
+    .dbyt $00d5
+    .dbyt $00e6
+    .dbyt $00c6
+    .dbyt $00e7
+    .dbyt $00c7
+    .dbyt $00fe
+    .dbyt $00f0
+    .dbyt $00de
+    .dbyt $00d0
+    .dbyt $00a3
+    .dbyt $0153
+    .dbyt $0152
+    .dbyt $00a1
+    .dbyt $00bf
+
+.bss
+
+utf_xlat_addr: .res 3

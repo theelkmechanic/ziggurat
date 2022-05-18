@@ -38,6 +38,8 @@
 .global atab_default
 .global atab_v1_default
 .global zscii_ctype_table
+.global utf_xlat_addr
+.global utf_xlat_default
 
 ; Push/pop a word on the stack (assumed big-endian). Routine takes value in x (high byte)/y (low byte).
 ; Macro gives you shortcuts for immediate and absolute addressing.
@@ -252,5 +254,5 @@
 .define FONT_WIDTH 1
 .define FONT_HEIGHT 1
 
-.define DEFAULT_FG W_LGREY
-.define DEFAULT_BG W_BLACK
+.define DEFAULT_FG ULCOLOR::LGREY
+.define DEFAULT_BG ULCOLOR::BLACK

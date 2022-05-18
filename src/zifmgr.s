@@ -9,7 +9,7 @@
 .code
 
 ;
-; load_file_to_hiram - Load a file into high memory pages (starting with bank 1)
+; load_file_to_hiram - Load a file into high memory pages (starting with bank 192)
 ;
 ; In:   r0          Pointer to filename
 ;       a           Filename length
@@ -26,7 +26,7 @@
     ldx gREG::r0L
     ldy gREG::r0H
     jsr SETNAM
-    pushb #1 ; start at bank 1
+    pushb #192 ; start at bank 192
     lda #0 ; specify address $A000
     ldx #0
     ldy #$A0
