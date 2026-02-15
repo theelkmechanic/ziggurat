@@ -18,18 +18,14 @@
 .endproc
 
 .proc show_status
-@g2 = $480
-@g3 = $482
-@save_op0 = $484
-@timeflags = $486
     ; Start with a space
     pha
     phx
     phy
     lda operand_0
-    sta @save_op0
+    sta ss_save_op0
     lda operand_0+1
-    sta @save_op0+1
+    sta ss_save_op0+1
     lda window_status
     ldx #0
     ldy #0
@@ -63,14 +59,14 @@
     lda #$11
     clc ; Pop stack if needed
     jsr fetch_varvalue
-    stx @g2
-    sty @g2+1
+    stx ss_g2
+    sty ss_g2+1
     lda #$12
     clc ; Pop stack if needed
     jsr fetch_varvalue
-    stx @g3
-    sty @g3+1
-    stz @timeflags
+    stx ss_g3
+    sty ss_g3+1
+    stz ss_timeflags
 
     ; Is this a score or a timed game?
     chkver V3,@show_score_or_time
@@ -81,18 +77,18 @@
     beq @show_score_or_time
 
     ; It's a timed game--load the hours from the second global
-    dec @timeflags
-    lda @g2+1
+    dec ss_timeflags
+    lda ss_g2+1
     cmp #12
     bcs @is_pm
 
     ; For AM, we change to 12 if 0 and clear bit 6 of @timeflags
     bne @2
     lda #12
-    sta @g2+1
-@2: lda @timeflags
+    sta ss_g2+1
+@2: lda ss_timeflags
     and #$bf
-    sta @timeflags
+    sta ss_timeflags
     bra @show_score_or_time
 
 @is_pm:
@@ -101,20 +97,20 @@
     sbc #11
     bne @3
     lda #12
-@3: sta @g2+1
+@3: sta ss_g2+1
 
 @show_score_or_time:
     ; Print @g2
-    lda @g2
+    lda ss_g2
     sta operand_0
-    lda @g2+1
+    lda ss_g2+1
     sta operand_0+1
     sec ; No leading zeroes
     lda window_status
     jsr do_print_num
 
     ; For score game print '/', for timed game print ':'
-    bit @timeflags
+    bit ss_timeflags
     bmi @1
     ldy #'/'
     .byte $2c
@@ -125,18 +121,18 @@
     jsr win_putchr
 
     ; Print @g3 (print two digits if it's a timed game)
-    lda @g3
+    lda ss_g3
     sta operand_0
-    lda @g3+1
+    lda ss_g3+1
     sta operand_0+1
     lda #$0
     sec
-    sbc @timeflags
+    sbc ss_timeflags
     lda window_status
     jsr do_print_num
 
     ; For timed game, print AM/PM
-    bit @timeflags
+    bit ss_timeflags
     bpl @finish_status
     php
     lda window_status
@@ -167,9 +163,9 @@
     jsr win_getcursor
     cpx #80
     bcc @finish_status
-    lda @save_op0
+    lda ss_save_op0
     sta operand_0
-    lda @save_op0+1
+    lda ss_save_op0+1
     sta operand_0+1
     ply
     plx
@@ -402,11 +398,11 @@
     cpy #0
     beq @done
     dey
-    sty $420
+    sty ew_temp
     jsr win_getcursor
-    cpy $420
+    cpy ew_temp
     bcs @done
-    ldy $420
+    ldy ew_temp
     ldx #0
     jsr win_setcursor
     jmp @done
@@ -474,26 +470,19 @@
 .endproc
 
 .proc do_split_window
-@main_top = $420
-@main_height = $421
-@main_cur_y = $422
-@upper_top = $423
-@upper_height = $424
-@upper_diff = $425
-
     ; Get the current state of things
     lda window_main
     jsr win_getpos
-    sty @main_top
+    sty sw_main_top
     jsr win_getsize
-    sty @main_height
+    sty sw_main_height
     jsr win_getcursor
-    sty @main_cur_y
+    sty sw_main_cur_y
     lda window_upper
     jsr win_getpos
-    sty @upper_top
+    sty sw_upper_top
     jsr win_getsize
-    sty @upper_height
+    sty sw_upper_height
 
     ; Are we unsplitting?
     lda operand_0
@@ -506,35 +495,35 @@
     sta current_window
 
     ; Do we need to unsplit?
-    ldy @upper_height
+    ldy sw_upper_height
     bne @calc_change
     jmp @done
 
 @calc_change:
     ; Figure out how many lines we're going to move main up
-    lda @main_top
+    lda sw_main_top
     sec
-    sbc @upper_top
-    sta @upper_diff
+    sbc sw_upper_top
+    sta sw_upper_diff
 
     ; Move main up, expand it, and move its cursor down, and set upper height to 0
-    lda @main_height
+    lda sw_main_height
     clc
-    adc @upper_diff
-    sta @main_height
+    adc sw_upper_diff
+    sta sw_main_height
     chkver V4,@noforcebottom
-    lda @main_height
+    lda sw_main_height
     dec
     bra @setmaincury
 @noforcebottom:
-    lda @main_cur_y
+    lda sw_main_cur_y
     clc
-    adc @upper_diff
+    adc sw_upper_diff
 @setmaincury:
-    sta @main_cur_y
-    lda @upper_top
-    sta @main_top
-    stz @upper_height
+    sta sw_main_cur_y
+    lda sw_upper_top
+    sta sw_main_top
+    stz sw_upper_height
     jmp @update_windows
 
 @do_split:
@@ -546,76 +535,76 @@
 @calcupperheight:
     lda #SCREEN_HEIGHT
     sec
-    sbc @upper_top
+    sbc sw_upper_top
     cmp operand_0+1
     bcs @upperheightok
     sta operand_0+1
 @upperheightok:
     lda operand_0+1
     sec
-    sbc @upper_height
-    sta @upper_diff
+    sbc sw_upper_height
+    sta sw_upper_diff
     bmi @shrinking
     bne @growing
     jmp @done
 
 @growing:
     ; Grow the upper window and shrink the main window
-    lda @upper_height
+    lda sw_upper_height
     clc
-    adc @upper_diff
-    sta @upper_height
-    lda @main_top
+    adc sw_upper_diff
+    sta sw_upper_height
+    lda sw_main_top
     clc
-    adc @upper_diff
-    sta @main_top
-    lda @main_cur_y
+    adc sw_upper_diff
+    sta sw_main_top
+    lda sw_main_cur_y
     sec
-    sbc @upper_diff
+    sbc sw_upper_diff
     bpl @yinrange
     lda #0
 @yinrange:
-    sta @main_cur_y
-    lda @main_height
+    sta sw_main_cur_y
+    lda sw_main_height
     sec
-    sbc @upper_diff
-    sta @main_height
+    sbc sw_upper_diff
+    sta sw_main_height
     bra @update_windows
 
 @shrinking:
     ; Shrink the upper window and grow the main window
-    lda @upper_height
+    lda sw_upper_height
     sec
-    sbc @upper_diff
-    sta @upper_height
-    lda @main_top
+    sbc sw_upper_diff
+    sta sw_upper_height
+    lda sw_main_top
     sec
-    sbc @upper_diff
-    sta @main_top
-    lda @main_cur_y
+    sbc sw_upper_diff
+    sta sw_main_top
+    lda sw_main_cur_y
     clc
-    adc @upper_diff
-    sta @main_cur_y
-    lda @main_height
+    adc sw_upper_diff
+    sta sw_main_cur_y
+    lda sw_main_height
     clc
-    adc @upper_diff
-    sta @main_height
+    adc sw_upper_diff
+    sta sw_main_height
 
 @update_windows:
     ; Update main and upper windows
     lda window_main
     jsr win_getpos
-    ldy @main_top
+    ldy sw_main_top
     jsr win_setpos
     jsr win_getsize
-    ldy @main_height
+    ldy sw_main_height
     jsr win_setsize
     jsr win_getcursor
-    ldy @main_cur_y
+    ldy sw_main_cur_y
     jsr win_setcursor
     lda window_upper
     jsr win_getsize
-    ldy @upper_height
+    ldy sw_upper_height
     jsr win_setsize
     ldx #0
     ldy #0
@@ -646,36 +635,51 @@
     jsr printf
 
     ; Set the appropriate text colors
+    ; Z-machine colors: 0=current, 1=default, 2-12=specific color
     lda window_main
-    jsr win_getcolor
-    lda operand_1+1
-    bne @checkdefaultbg
-    txa
-    and #$f0
-    bra @getfg
-@checkdefaultbg:
-    cmp #1
-    bpl @setbg
-    lda #DEFAULT_BG
-@setbg:
-    asl
-    asl
-    asl
-    asl
+    jsr win_getcolor        ; X = packed (bg<<4)|fg
 
-@getfg:
-    sta operand_1+1
-    lda operand_0+1
-    bne @checkdefaultfg
-    txa
-    bra @setfg
-@checkdefaultfg:
+    ; Handle bg (operand_1+1)
+    lda operand_1+1
+    beq @keep_bg            ; 0 = keep current bg
     cmp #1
-    bpl @setfg
+    beq @default_bg         ; 1 = use default
+    tay
+    lda zmcolor_to_ulcolor,y ; 2-12: translate to ULCOLOR
+    bra @have_bg
+@default_bg:
+    lda #DEFAULT_BG
+    bra @have_bg
+@keep_bg:
+    txa
+    lsr
+    lsr
+    lsr
+    lsr                     ; extract current bg
+@have_bg:
+    asl
+    asl
+    asl
+    asl                     ; shift to high nibble
+    sta operand_1+1
+
+    ; Handle fg (operand_0+1)
+    lda operand_0+1
+    beq @keep_fg            ; 0 = keep current fg
+    cmp #1
+    beq @default_fg         ; 1 = use default
+    tay
+    lda zmcolor_to_ulcolor,y ; 2-12: translate to ULCOLOR
+    bra @have_fg
+@default_fg:
     lda #DEFAULT_FG
-@setfg:
+    bra @have_fg
+@keep_fg:
+    txa                     ; extract current fg from packed
+@have_fg:
     and #$0f
-    ora operand_1+1
+    ora operand_1+1         ; combine fg with bg
+    tax
     lda window_main
     jsr win_setcolor
     lda window_upper
@@ -788,4 +792,21 @@ utf_xlat_default:
 
 .bss
 
-utf_xlat_addr: .res 3
+utf_xlat_addr:      .res 3
+
+; show_status temps
+ss_g2:              .res 2
+ss_g3:              .res 2
+ss_save_op0:        .res 2
+ss_timeflags:       .res 1
+
+; do_split_window temps
+sw_main_top:        .res 1
+sw_main_height:     .res 1
+sw_main_cur_y:      .res 1
+sw_upper_top:       .res 1
+sw_upper_height:    .res 1
+sw_upper_diff:      .res 1
+
+; op_erase_window temp
+ew_temp:            .res 1

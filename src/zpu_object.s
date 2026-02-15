@@ -3,8 +3,6 @@
 
 .code
 
-set_or_clear = $400
-
 .proc op_set_attr
     ; Want to set the attribute
     lda #$ff
@@ -391,8 +389,8 @@ set_or_clear = $400
 
 .proc do_print_obj
     ; Find the base address of our object
-    sta $400 ; Save window to print to
-    stx $401 ; Save max length to print
+    sta dpo_save_win ; Save window to print to
+    stx dpo_save_maxlen ; Save max length to print
     ldx operand_0
     ldy operand_0+1
     jsr find_object
@@ -401,8 +399,8 @@ set_or_clear = $400
     ; Now find the property table address in that object and print the encoded string one byte into it
     jsr find_proptable_addr
     jsr mem_fetch_and_advance
-    lda $400 ; Get window to print to
-    ldx $401 ; Get max length to print
+    lda dpo_save_win ; Get window to print to
+    ldx dpo_save_maxlen ; Get max length to print
     jsr print_encoded
     popb
     rts
@@ -1063,3 +1061,9 @@ msg_op_get_parent: .byte "Getting object @'s parent", CH::ENTER, 0
 msg_op_get_sibling: .byte "Getting object @'s sibling", CH::ENTER, 0
 msg_op_get_child: .byte "Getting object @'s child", CH::ENTER, 0
 msg_op_storing_result: .byte "Storing result in var # value=@", CH::ENTER, 0
+
+.bss
+
+set_or_clear:       .res 1
+dpo_save_win:       .res 1
+dpo_save_maxlen:    .res 1

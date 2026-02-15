@@ -12,13 +12,9 @@
 ostream_flags:          .byte   OSTREAM_SCREEN  ; High nibble is stream flags, low nibble is current index into stream arrays
 ostream_table_bases:    .res    16*3
 
-table_aryidx = $4c0
-
 .code
 
 .proc op_output_stream
-stream_num = $400
-stream_select = $401
 
     lda num_operands
     dec
@@ -174,7 +170,6 @@ stream_select = $401
     rts
 
     ; Load the stream index
-table_aryidx = $4c0
 :   phx
     phy
     pha
@@ -262,3 +257,8 @@ table_aryidx = $4c0
 msg_op_output_stream:                   .byte "Output stream @", CH::ENTER, 0
 msg_op_output_stream_with_table:        .byte "Output stream @ table=@", CH::ENTER, 0
 msg_op_output_stream_with_table_width:  .byte "Output stream @ table=@ width=@", CH::ENTER, 0
+
+.bss
+
+stream_select:  .res 1
+table_aryidx:   .res 1

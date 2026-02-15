@@ -2,47 +2,6 @@
 .include "zpu.inc"
 .include "zscii_type.inc"
 
-was_buffering = $440
-last_flash = $441
-last_flash_on = $442
-
-read_start_x = $443
-read_start_y = $444
-last_scrl_cnt = $445
-max_chars = $446
-chars_typed = $447
-read_v5 = $448
-term_char = $449
-
-max_words = $44a
-words_typed = $44b
-text_idx = $440
-skip_unknown = $441
-parse_char = $442
-num_seps = $443
-word_dict = $44c
-word_len = $44e
-word_pos = $44f
-word_buf = $500
-
-encoded_buf = $600
-encoded_size = $60f
-max_zchars = $610
-current_zchar = $611
-
-
-entry_count = $444
-entry_size = $446
-dict_0 = $612
-dict_addr = $614
-dict_idx_x2 = $616
-dict_idx_x4 = $618
-dict_idx_x8 = $616
-curr_idx = $61a
-range_begin = $61c
-range_end = $61e
-memreg_save = $620
-
 .code
 
 op_input_stream:
@@ -1147,3 +1106,50 @@ zscii_encode_map: ; (characters 33-126)
 msg_op_read_char: .byte "Reading @ char", CH::ENTER, 0
 msg_op_read: .byte "Reading input", CH::ENTER, 0
 msg_op_tokenise: .byte "Tokenize buffer @ into @ using dict @ flag=@", CH::ENTER, 0
+
+.bss
+
+; Read/input temps
+was_buffering:      .res 1
+last_flash:         .res 1
+last_flash_on:      .res 1
+read_start_x:      .res 1
+read_start_y:      .res 1
+last_scrl_cnt:     .res 1
+max_chars:          .res 1
+chars_typed:        .res 1
+read_v5:            .res 1
+term_char:          .res 1
+max_words:          .res 1
+words_typed:        .res 1
+
+; Parse temps
+text_idx:           .res 1
+skip_unknown:       .res 1
+parse_char:         .res 1
+num_seps:           .res 1
+
+; Word parsing
+word_dict:          .res 2
+word_len:           .res 1
+word_pos:           .res 1
+word_buf:           .res 80
+
+; Encoding
+encoded_buf:        .res 15
+encoded_size:       .res 1
+max_zchars:         .res 1
+current_zchar:      .res 1
+
+; Dictionary search
+entry_count:        .res 2
+entry_size:         .res 1
+dict_0:             .res 2
+dict_addr:          .res 2
+dict_idx_x2:        .res 2
+dict_idx_x8 = dict_idx_x2
+dict_idx_x4:        .res 2
+curr_idx:           .res 2
+range_begin:        .res 2
+range_end:          .res 2
+memreg_save:        .res 3

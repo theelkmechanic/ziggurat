@@ -394,7 +394,8 @@ printf_use_chrout: .res 1
     jsr win_clear
 
 @start_zmachine:
-;    jsr debugchrdump
+    ; Refresh the screen to show all windows
+    jsr ulwin_refresh
 
     ; Start the Z-machine
     lda #<msg_launching

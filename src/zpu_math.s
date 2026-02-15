@@ -1,12 +1,6 @@
 .include "ziggurat.inc"
 .include "zpu.inc"
 
-do_check_flag = $400
-do_arith_shift_flag = $400
-want_remainder = $400
-muldiv_sign = $401
-remainder_sign = $402
-
 .code
 
 .proc op_dec_chk
@@ -601,3 +595,11 @@ msg_op_random: .byte "Random range=@ value=@", CH::ENTER, 0
 .data
 
 random_seed:    .byte $ac, $e1
+
+.bss
+
+do_check_flag:          .res 1
+do_arith_shift_flag = do_check_flag
+want_remainder = do_check_flag
+muldiv_sign:            .res 1
+remainder_sign:         .res 1

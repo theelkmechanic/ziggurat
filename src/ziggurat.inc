@@ -3,9 +3,15 @@
 .include "cx16.inc"
 .include "cbm_kernal.inc"
 .include "unilib.inc"
+.include "zwin.inc"
 
-; We can use $0400-$07ff as 1k of temporary buffer for loading/saving/etc.
-temp_buffer = $0400
+; UniLib ROM BSS occupies $0400-$05CA, so temp_buffer starts at $0600
+temp_buffer = $0600
+
+; Aliases for old KERNAL/hardware names used by ZPU code
+BANK_RAM = BANKSEL::RAM
+SCREEN_SET_MODE = SCREEN_MODE
+RESTORE_BASIC = ENTER_BASIC
 
 ; Global functions for everyone to use
 .global printf

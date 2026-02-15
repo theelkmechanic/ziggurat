@@ -3,11 +3,6 @@
 
 .import load_file_to_hiram, __BSS_RUN__, __BSS_SIZE__
 
-.zeropage
-
-zpu_mem:    .res    3
-zpu_mem_2:  .res    3
-
 .segment "EXEHDR"
     ; Stub launcher
     .byte $0b, $08, $b0, $07, $9e, $32, $30, $36, $31, $00, $00, $00
@@ -114,6 +109,12 @@ maincode:
                         jsr ulwin_close
 
                         ; Open the file picker window
+                        ; Create title string first (ulstr_fromUtf8 clobbers r0-r2)
+                        ldx #<choose
+                        ldy #>choose
+                        jsr ulstr_fromUtf8
+                        stx gREG::r3L
+                        sty gREG::r3H
                         lda #57
                         sta gREG::r0L
                         lda #11
@@ -126,11 +127,6 @@ maincode:
                         sta gREG::r2L
                         lda #ULCOLOR::DGREY
                         sta gREG::r2H
-                        ldx #<choose
-                        ldy #>choose
-                        jsr ulstr_fromUtf8
-                        stx gREG::r3L
-                        sty gREG::r3H
                         lda #ULWIN_FLAGS::BORDER
                         sta gREG::r4H
                         jsr ulwin_open
@@ -165,10 +161,8 @@ maincode:
                         lda titlewin
                         jsr ulwin_close
 
-@loop: bra @loop
-
                         ; Start the ZPU
-;                        jmp zpu_start
+                        jmp zpu_start
 
 .proc show_title
                         ; Use zpu_mem because it's easier to scan with
@@ -518,15 +512,15 @@ maincode:
                         jsr mem_fetch_and_advance
                         cmp #$22
                         beq @found_end
-                        sta $400,x
+                        sta fname_temp,x
                         inx
                         bra @find_name_end
 
                         ; NUL-terminate, turn into a string, and save to our list
 @found_end:
-                        stz $400,x
-                        ldx #0
-                        ldy #4
+                        stz fname_temp,x
+                        ldx #<fname_temp
+                        ldy #>fname_temp
                         jsr ulstr_fromUtf8
                         txa
                         jsr mem2_store_and_advance
@@ -542,72 +536,6 @@ maincode:
                         bne @skip_line
                         bra @check_count
 .endproc
-
-.proc mem_fetch_and_advance
-    lda (zpu_mem)
-    pha
-    inc zpu_mem
-    beq mem_advance_finish
-    pla
-    rts
-.endproc
-
-.proc mem_advance
-    pha
-    clc
-    adc zpu_mem
-    sta zpu_mem
-    bcc mem_advance_skip
-
-    ; FALL THRU INTENTIONAL
-.endproc
-
-mem_advance_finish:
-    inc zpu_mem+1
-    lda zpu_mem+1
-    cmp #$c0
-    bcc mem_advance_skip
-    lda #$a0
-    sta zpu_mem+1
-    inc zpu_mem+2
-    lda zpu_mem+2
-    sta BANKSEL::RAM
-mem_advance_skip:
-    pla
-    rts
-
-.proc mem2_store_and_advance
-    sta (zpu_mem_2)
-    pha
-    inc zpu_mem_2
-    beq mem2_advance_finish
-    pla
-    rts
-.endproc
-
-.proc mem2_advance
-    pha
-    clc
-    adc zpu_mem_2
-    sta zpu_mem_2
-    bcc mem2_advance_skip
-
-    ; FALL THRU INTENTIONAL
-.endproc
-
-mem2_advance_finish:
-    inc zpu_mem_2+1
-    lda zpu_mem_2+1
-    cmp #$c0
-    bcc mem2_advance_skip
-    lda #$a0
-    sta zpu_mem_2+1
-    inc zpu_mem_2+2
-    lda zpu_mem_2+2
-    sta BANKSEL::RAM
-mem2_advance_skip:
-    pla
-    rts
 
 loadingmsg:     .byte "LOADING "
 zigfont:        .byte "ZIGGURAT.FNT"
@@ -634,6 +562,7 @@ fncount:        .res    1
 fntoplineidx:   .res    1
 curline:        .res    1
 chunklen:       .res    1
+fname_temp:     .res    20
 fnlist:
 
 zigbits:    .byte $20, $97, $96, $84, $9d, $90, $9e, $9f, $98, $9a, $8c, $99, $80, $9c, $9b, $88
