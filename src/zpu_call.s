@@ -33,9 +33,6 @@ op_call_save:
     ldy #$80
 
 .proc op_call
-; Use temp storage at $400 for these function locals
-num_locals = $400
-ops_and_locals = $401
 
     ; Calling a routine at address 0 does nothing and returns false
     lda operand_0
@@ -369,9 +366,6 @@ do_lt:
 ;    jsr printf
     lda operand_1
 
-; Use temp storage at $400 for these function locals
-branch_offset = $400
-do_branch_flag = $402
 
     ; Check the first branch byte. Bit 7 tells us if we need to branch on true (set)
     ; or false (clear). If we eor a with the first branch byte, we should then have
@@ -618,3 +612,13 @@ msg_int: .byte "int", 0
 msg_void: .byte "void", 0
 msg_op_test: .byte "Testing @ & @ == 0", CH::ENTER, 0
 msg_op_check_arg_count: .byte "Checking if have arg @", CH::ENTER, 0
+
+.bss
+
+; op_call temps (moved from $400-$401 to avoid UniLib BSS conflict)
+num_locals:     .res 1
+ops_and_locals: .res 1
+
+; follow_branch temps (moved from $400-$402 to avoid UniLib BSS conflict)
+branch_offset:  .res 2
+do_branch_flag: .res 1

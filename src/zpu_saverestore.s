@@ -72,7 +72,7 @@ opext_save:
     pha
     lda zpu_pc+2
     pha
-    pushb #1
+    pushb #ZIF_BASE_BANK
 
     ; Get the length of the file in bytes
     ldx ZMheader::zif_len

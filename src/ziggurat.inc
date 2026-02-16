@@ -3,10 +3,7 @@
 .include "cx16.inc"
 .include "cbm_kernal.inc"
 
-.include "windies.inc"
-
-; We can use $0400-$07ff as 1k of temporary buffer for loading/saving/etc.
-temp_buffer = $0400
+.include "zmwin.inc"
 
 ; Global functions for everyone to use
 .global printf
@@ -111,6 +108,9 @@ F2_WANTMENU         = $0100
 
 F3_WANTTRANS        = $0001
 
+; Base bank for ZIF data (must be above UniLib's banks 1-~20)
+ZIF_BASE_BANK = $80
+
 ; Error codes
 .global print_error_and_exit
 SUCCESS                     = $00
@@ -131,6 +131,7 @@ ERR_TODO                    = $0b
 ; For r39 emulator and actual hardware
 BANK_RAM = $00
 BANK_ROM = $01
+
 
 ; For r38 emulator
 ;BANK_RAM = VIA1::PRA

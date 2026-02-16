@@ -12,21 +12,7 @@ opext_print_form:
 opext_print_unicode:
     jmp opext_illegal
 
-return_after_printing = $400
-three_chars = $401
-end_flag = $404
-alphabet_offset = $405
-special_flags = $406
-working_encchr = $407
-partial_zscii = $408
-abbrev_offset = $409
-print_window = $40a
-print_len = $40b
-print_so_far = $40c
-print_dots_at = $40d
-zscii_work = $40e
-zscii_zmem_save = $40f
-memreg_save = $412
+; Temp vars are in .bss at end of file
 
 ALPHA_OFFSET_A1 = 26
 ALPHA_OFFSET_A2 = 52
@@ -503,8 +489,7 @@ print_zscii:
 @print_it:
     ; Print the character in x/y and advance the cursor
     lda print_window
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
     inc print_so_far
 @done:
     plx
@@ -573,9 +558,6 @@ specchr_handler_shiftlock_down:
 .endproc
 
 .proc do_print_num
-dec_value = $400
-started_printing_digits = $403
-print_two_digits = $404
     ; Print the number in operand_0 as a signed integer
     sta print_window
     stz print_len
@@ -703,3 +685,24 @@ msg_op_print_char: .byte "Printing ZSCII character @", CH::ENTER, 0
 msg_op_print_num: .byte "Printing number @", CH::ENTER, 0
 msg_op_print_addr: .byte "Printing encoded text at byte addr @", CH::ENTER, 0
 msg_op_print_paddr: .byte "Printing encoded text at packed addr @", CH::ENTER, 0
+
+.bss
+
+return_after_printing:  .res 1
+three_chars:            .res 3
+end_flag:               .res 1
+alphabet_offset:        .res 1
+special_flags:          .res 1
+working_encchr:         .res 1
+partial_zscii:          .res 1
+abbrev_offset:          .res 1
+print_window:           .res 1
+print_len:              .res 1
+print_so_far:           .res 1
+print_dots_at:          .res 1
+zscii_work:             .res 1
+zscii_zmem_save:        .res 3
+memreg_save:            .res 7
+dec_value:              .res 3
+started_printing_digits: .res 1
+print_two_digits:       .res 1

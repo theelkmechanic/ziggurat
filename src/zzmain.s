@@ -1,5 +1,13 @@
+; zzmain.s - Ziggurat launcher with UniLib initialization
+;
+; Initializes UniLib, draws the title screen, presents a file picker,
+; loads the selected game file, and starts the ZPU.
+; Uses UniLib directly for all windowing (ulwin_*), file picker
+; (ulwin_picklist), and loading messages (ulwin_flash).
+
 .include "ziggurat.inc"
 .include "zpu.inc"
+.include "unilib.inc"
 
 .import load_file_to_hiram
 
@@ -8,47 +16,88 @@
     .byte $0b, $08, $b0, $07, $9e, $32, $30, $36, $31, $00, $00, $00
     jmp maincode
 
-titlewin = $803
-filewin = $804
-loadwinwidth = $400
-fnlen = $401
-fnaddr = $402
-filename = $404
-fncount = $400
-fnlist = $414
-fntoplineidx = $404
-curline = $405
-chunklen = $800
-
-.data
+.code
 
 maincode:
-    ; Initialize our windowing library
-    lda #1
-    sta BANK_RAM
-    jsr win_init
-
-    ; Show title screen
-    ; Open a full-screen window
-    jsr win_open
-    sta titlewin
-    ldx #0
+    ; Clear BSS (not done automatically in assembly mode)
+    ; __BSS_RUN__ and __BSS_SIZE__ defined by linker config
+    .import __BSS_RUN__, __BSS_SIZE__
+    lda #<__BSS_RUN__
+    sta gREG::r0L
+    lda #>__BSS_RUN__
+    sta gREG::r0H
+    lda #0
     ldy #0
-    jsr win_setpos
-    jsr win_setcursor
-    jsr win_setwrap
-    ldx #80
-    ldy #30
-    jsr win_setsize
-    ldx #(W_WHITE << 4) + W_DGREY
-    jsr win_setcolor
-    jsr win_clear
+    ldx #>__BSS_SIZE__      ; number of full pages
+    beq @bss_partial
+@bss_page:
+    sta (gREG::r0),y
+    iny
+    bne @bss_page
+    inc gREG::r0H
+    dex
+    bne @bss_page
+@bss_partial:
+    ldx #<__BSS_SIZE__      ; remaining bytes
+    beq @bss_done
+@bss_tail:
+    sta (gREG::r0),y
+    iny
+    dex
+    bne @bss_tail
+@bss_done:
+
+    ; Limit UniLib's RAM usage so it doesn't use banks >= ZIF_BASE_BANK.
+    ; With -ram 2048, MEMTOP returns 0 (256 wraps). Tell it we only have
+    ; ZIF_BASE_BANK banks so UniLib's heap+pools stay below the game data.
+    ; CLC = SET mode for MEMTOP (SEC = GET mode).
+    lda #ZIF_BASE_BANK      ; $80 = 128 banks available for UniLib
+    ldx #0
+    ldy #$A0                ; address $A000 (start of banked window)
+    clc
+    jsr MEMTOP
+
+    ; Initialize UniLib (loads font, sets up VERA, creates window 0)
+    ; UniLib will use banks 1 to ~ZIF_BASE_BANK-6 for heap+pools.
+    ; NOTE: SEI to prevent KERNAL IRQ from clobbering VERA during setup
+    sei
+    stz gREG::r0L
+    stz gREG::r0H
+    stz gREG::r1L       ; r1L=0: use ROM built-in font (no file load)
+    lda #8              ; device 8 (unused when r1L=0, but set anyway)
+    sta gREG::r1H
+    lda #ULCOLOR::LGREY
+    sta gREG::r2L
+    lda #ULCOLOR::BLACK
+    sta gREG::r2H
+    jsr ul_init
+    cli
+
+    ; Leave window 0 open — it's the screen window, and UniLib's
+    ; window map/occlusion system depends on it. The shim will
+    ; create additional windows on top of it.
+
+    ; Show title screen — open a full-screen window directly via UniLib
+    stz gREG::r0L               ; left = 0
+    stz gREG::r0H               ; top = 0
+    lda #80
+    sta gREG::r1L               ; width = 80
+    lda #30
+    sta gREG::r1H               ; height = 30
+    lda #ULCOLOR::DGREY
+    sta gREG::r2L               ; foreground
+    lda #ULCOLOR::WHITE
+    sta gREG::r2H               ; background
+    stz gREG::r4L
+    stz gREG::r4H               ; no border
+    jsr ulwin_open
+    sta titlewin
+    jsr ulwin_clear
     jsr show_title
 
-    ; Show "Loading directory" message
+    ; Show "Loading directory" flash message
     ldx #>directory
     ldy #<directory
-    lda #9
     jsr show_loading
 
     ; Load the directory into high memory
@@ -63,62 +112,115 @@ maincode:
     ; Save the addresses/lengths of all our filenames
     jsr parse_filenames
 
-    ; Close the loading message and repaint the title
-    lda filewin
-    jsr win_close
+    ; Clear window and repaint title (removes flash message artifact)
+    lda titlewin
+    jsr ulwin_clear
     jsr show_title
 
-    ; Open the file picker window
-    jsr win_open
-    sta filewin
-    ldx #56
-    ldy #10
-    jsr win_setpos
-    ldx #0
+    ; Build a stringtable from the parsed filenames
+    jsr build_stringtable
+
+    ; Create title string for picker window
+    ldx #<choose
+    ldy #>choose
+    jsr ulstr_fromUtf8
+    bcc @got_title
+    stz gREG::r3L
+    stz gREG::r3H
+    bra @open_picker
+@got_title:
+    stx gREG::r3L
+    sty gREG::r3H
+    stx pick_title
+    sty pick_title+1
+
+@open_picker:
+    ; Open bordered picker window directly via UniLib
+    ; Border is drawn outside the content area, so offset by 1
+    ; to keep border within the cleared title area (cols 56-75, rows 10-24)
+    lda #57
+    sta gREG::r0L               ; left (border at col 56)
+    lda #12
+    sta gREG::r0H               ; top (border at row 11)
+    lda #19
+    sta gREG::r1L               ; width (border adds 2 → 21 total)
+    lda #14
+    sta gREG::r1H               ; height (border adds 2 → 16 total)
+    lda #ULCOLOR::WHITE
+    sta gREG::r2L
+    lda #ULCOLOR::DGREY
+    sta gREG::r2H
+    stz gREG::r4L
+    lda #ULWIN_FLAGS::BORDER
+    sta gREG::r4H
+    jsr ulwin_open
+    sta filewin_handle
+
+    ; Let user pick a file
+@pick_again:
+    lda filewin_handle
+    ldx strtbl_brp
+    ldy strtbl_brp+1
+    jsr ulwin_picklist
+    ; A = 1-based selection index (0 = cancelled)
+    cmp #0
+    beq @pick_again
+    sta pick_result
+
+    ; Close the picker window
+    lda filewin_handle
+    jsr ulwin_close
+    jsr ulwin_refresh
+
+    ; Free the stringtable
+    ldx strtbl_brp
+    ldy strtbl_brp+1
+    jsr ulstb_delete
+
+    ; Release title string if it was created
+    lda pick_title
+    ora pick_title+1
+    beq @no_rel_title
+    ldx pick_title
+    ldy pick_title+1
+    jsr ulstr_release
+@no_rel_title:
+
+    ; Copy selected filename to buffer
+    lda pick_result
+    dec                         ; convert 1-based to 0-based
+    jsr find_fname_addr
     ldy #0
-    jsr win_setcursor
-    jsr win_setwrap
-    ldx #20
-    ldy #18
-    jsr win_setsize
-    ldx #(W_DGREY << 4) + W_WHITE
-    jsr win_setcolor
-    jsr win_clear
-    jsr boxfilewin
-    lda filewin
-    ldx #2
-    ldy #0
-    jsr win_setcursor
-    ldx #>choose
-    ldy #<choose
-    jsr printxy
-    lda filewin
-    jsr win_getpos
-    inx
+@cpfn:
+    jsr mem_fetch_and_advance
+    sta filename,y
     iny
-    jsr win_setpos
-    jsr win_getsize
-    dex
-    dex
+    cpy fnlen
+    bcc @cpfn
+    ; Trim trailing $A0 (PETSCII shifted space padding)
+@cpfn_trim:
     dey
-    dey
-    jsr win_setsize
+    bmi @cpfn_trimmed
+    lda filename,y
+    cmp #$a0
+    beq @cpfn_trim
+    iny
+@cpfn_trimmed:
+    lda #0
+    sta filename,y
 
-    ; Choose the file to load
-    jsr choose_file
-
-    ; Close the file picker window, repaint the title screen
-    lda filewin
-    jsr win_close
+    ; Repaint title and show "Loading <filename>" flash
     jsr show_title
-
-    ; Show "Loading filename" message
-    lda fnlen
     ldx #>filename
     ldy #<filename
     jsr show_loading
 
-    ; Load the ZIF file
+    ; Reset KERNAL file state (directory load may leave channels dirty)
+    jsr CLRCHN
+    lda #1
+    jsr CLOSE
+
+    ; Load the selected ZIF file
     lda #>filename
     sta gREG::r0H
     lda #<filename
@@ -127,11 +229,9 @@ maincode:
     ldx #8
     jsr load_file_to_hiram
 
-    ; Close our windows
-    lda filewin
-    jsr win_close
+    ; Close title window before ZPU init creates its own
     lda titlewin
-    jsr win_close
+    jsr ulwin_close
 
     ; Start the ZPU
     jmp zpu_start
@@ -155,22 +255,25 @@ maincode:
     lda titlewin
     ldx #23
     ldy #16
-    jsr win_setcursor
+    jsr ulwin_putcursor
     ldx #>azmachine
     ldy #<azmachine
     jsr printxy
+    lda titlewin
     ldx #23
     ldy #17
-    jsr win_setcursor
+    jsr ulwin_putcursor
     ldx #>forthex16
     ldy #<forthex16
     jsr printxy
+    lda titlewin
     ldx #1
     ldy #28
-    jsr win_setcursor
+    jsr ulwin_putcursor
     ldx #>versionstr
     ldy #<versionstr
-    jmp printxy
+    jsr printxy
+    jmp ulwin_refresh
 
 @goodchunk:
     ; Draw a chunk of graphics
@@ -178,7 +281,7 @@ maincode:
     jsr mem_fetch_and_advance
     tay
     lda titlewin
-    jsr win_setcursor
+    jsr ulwin_putcursor
 
     ; Read length
     jsr mem_fetch_and_advance
@@ -196,8 +299,7 @@ maincode:
 @notblock:
     ldx #0
     lda titlewin
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
     dec chunklen
     bne @draw_next
     bra @draw_chunk
@@ -234,224 +336,6 @@ maincode:
     rts
 .endproc
 
-.proc update_yline
-    ; Check if fntoplineidx + y < count
-    phy
-    tya
-    clc
-    adc fntoplineidx
-    cmp fncount
-    bcs @done
-
-    ; Okay, line should be a valid filename, so find it and print it
-    jsr find_fname_addr
-
-    ; Is this the current line
-    lda filewin
-    ldx #0
-    jsr win_setcursor
-    cpy curline
-    beq @iscurrent
-    ldy #' '
-    .byte $2c
-@iscurrent:
-    ldy #34
-    ldx #$e0
-    sec
-    jsr win_putchr
-
-    ; Print the filename followed by enough spaces to clear the remainder of the line
-    stz gREG::r0
-    ldx #0
-@printloop:
-    lda gREG::r0
-    cmp #16
-    bcs @done
-    cmp fnlen
-    bcs @usespace
-    jsr mem_fetch_and_advance
-    .byte $2c
-@usespace:
-    lda #' '
-    tay
-    lda filewin
-    sec
-    jsr win_putchr
-    inc gREG::r0
-    bra @printloop
-
-@done:
-    ply
-    rts
-.endproc
-
-.proc choose_file
-    ; Show first (up to) 16 filenames
-    lda filewin
-    jsr win_clear
-    ldx #0
-    ldy #0
-    jsr win_setcursor
-    stz fntoplineidx
-    stz curline
-    ldy #15
-@1: jsr update_yline
-    dey
-    bpl @1
-
-@keys:
-    jsr GETIN
-    cmp #17
-    beq @cursordown
-    cmp #145
-    beq @cursorup
-    cmp #13
-    beq @selected
-    bra @keys
-
-@cursorup:
-    ; Check if we're at the top
-    lda curline
-    beq @atthetop
-    dec curline
-    tay
-    jsr update_yline
-    dey
-    jsr update_yline
-    bra @keys
-
-@atthetop:
-    ; Can we scroll more names into view?
-    lda fntoplineidx
-    beq @keys
-    lda filewin
-    jsr win_scrolldown
-    dec fntoplineidx
-    ldy #0
-    jsr update_yline
-    iny
-    jsr update_yline
-    bra @keys
-
-@cursordown:
-    ; Check if we're at the end of the file list
-    lda fntoplineidx
-    clc
-    adc curline
-    inc
-    cmp fncount
-    bcs @keys
-
-    ; We can move down, are we at the last line
-    lda curline
-    cmp #15
-    bcs @atthebottom
-    inc curline
-    tay
-    jsr update_yline
-    iny
-    jsr update_yline
-    bra @keys
-
-@atthebottom:
-    ; Scroll another name into view
-    lda filewin
-    jsr win_scroll
-    inc fntoplineidx
-    ldy curline
-    jsr update_yline
-    dey
-    jsr update_yline
-    bra @keys
-
-@selected:
-    lda fntoplineidx
-    clc
-    adc curline
-    jsr find_fname_addr
-    lda #>filename
-    sta gREG::r0H
-    lda #<filename
-    sta gREG::r0L
-    ldy #0
-@2: jsr mem_fetch_and_advance
-    sta (gREG::r0),y
-    iny
-    cpy fnlen
-    bcc @2
-    lda #0
-    sta (gREG::r0),y
-    rts
-.endproc
-
-.proc boxfilewin
-    lda filewin
-    jsr win_getsize
-    txa
-    dec
-    sta gREG::r7H
-    dec
-    sta gREG::r6L
-    sta gREG::r6H
-    tya
-    dec
-    dec
-    sta gREG::r7L
-    lda filewin
-    ldx #0
-    ldy #0
-    jsr win_setcursor
-    ldx #$e0
-    ldy #47
-    sec
-    jsr win_putchr
-    ldy #39
-@1: dec gREG::r6L
-    bmi @2
-    sec
-    jsr win_putchr
-    bra @1
-@2: ldy #48
-    sec
-    jsr win_putchr
-    ldx #0
-    ldy #13
-    sec
-    jsr win_putchr
-@3: dec gREG::r7L
-    bmi @4
-    ldx #$e0
-    ldy #41
-    sec
-    jsr win_putchr
-    jsr win_getcursor
-    ldx gREG::r7H
-    jsr win_setcursor
-    ldx #$e0
-    ldy #40
-    sec
-    jsr win_putchr
-    ldx #0
-    ldy #13
-    sec
-    jsr win_putchr
-    bra @3
-@4: ldx #$e0
-    ldy #46
-    sec
-    jsr win_putchr
-    ldy #38
-@5: dec gREG::r6H
-    bmi @6
-    sec
-    jsr win_putchr
-    bra @5
-@6: ldy #49
-    sec
-    jsr win_putchr
-    rts
-.endproc
-
 .proc printxy
     sta gREG::r1
     stx gREG::r0H
@@ -463,8 +347,7 @@ maincode:
     tay
     ldx #0
     lda gREG::r1
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
     ply
     iny
     bne @1
@@ -474,54 +357,148 @@ maincode:
     rts
 .endproc
 
+; show_loading - Display a "Loading <name>..." flash message via ulwin_flash
+; In: X = name string addr high, Y = name string addr low (NUL-terminated)
 .proc show_loading
-    sta fnlen
     stx fnaddr+1
     sty fnaddr
-    jsr win_open
-    sta filewin
-    lda fnlen
-    clc
-    adc #15
-    sta loadwinwidth
-    lda #76
-    sec
-    sbc loadwinwidth
-    tax
-    lda filewin
-    ldy #25
-    jsr win_setpos
+
+    ; Build "Loading <name>..." in msg_buf
     ldx #0
+@prefix:
+    lda loading,x
+    beq @name
+    sta msg_buf,x
+    inx
+    bra @prefix
+
+@name:
+    lda fnaddr
+    sta gREG::r5L
+    lda fnaddr+1
+    sta gREG::r5H
     ldy #0
-    jsr win_setcursor
-    jsr win_setwrap
-    ldx loadwinwidth
-    ldy #3
-    jsr win_setsize
-    ldx #(W_DGREY << 4) + W_WHITE
-    jsr win_setcolor
-    jsr win_clear
-    jsr boxfilewin
-    lda filewin
-    ldx #2
-    ldy #1
-    jsr win_setcursor
-    ldx #>loading
-    ldy #<loading
-    jsr printxy
-    ldx fnaddr+1
-    ldy fnaddr
-    jsr printxy
-    ldx #>threedots
-    ldy #<threedots
-    jmp printxy
+@name_loop:
+    lda (gREG::r5),y
+    beq @suffix
+    sta msg_buf,x
+    inx
+    iny
+    bra @name_loop
+
+@suffix:
+    ldy #0
+@suffix_loop:
+    lda threedots,y
+    sta msg_buf,x
+    beq @flash
+    inx
+    iny
+    bra @suffix_loop
+
+@flash:
+    ; Create UniLib string from the message
+    ldx #<msg_buf
+    ldy #>msg_buf
+    jsr ulstr_fromUtf8
+    bcs @done
+    stx gREG::r0L
+    sty gREG::r0H
+    stz gREG::r1L
+    stz gREG::r1H
+    ldx #ULCOLOR::WHITE
+    ldy #ULCOLOR::DGREY
+    jsr ulwin_flash
+    ; r0 preserved by ulwin_flash - release the string
+    ldx gREG::r0L
+    ldy gREG::r0H
+    jsr ulstr_release
+
+@done:
+    rts
+.endproc
+
+; build_stringtable - Create a stringtable from parsed filenames
+; Out: carry clear on success (strtbl_brp set), carry set on error
+.proc build_stringtable
+    lda fncount
+    jsr ulstb_create
+    bcs @error
+    stx strtbl_brp
+    sty strtbl_brp+1
+
+    stz pick_idx
+
+@loop:
+    lda pick_idx
+    cmp fncount
+    bcs @done
+
+    ; Get filename address in banked RAM
+    jsr find_fname_addr
+
+    ; Copy filename to buffer and NUL-terminate
+    ldy #0
+@copy:
+    jsr mem_fetch_and_advance
+    sta filename,y
+    iny
+    cpy fnlen
+    bcc @copy
+    ; Trim trailing $A0 (PETSCII shifted space padding)
+@trim:
+    dey
+    bmi @trimmed
+    lda filename,y
+    cmp #$a0
+    beq @trim
+    iny                         ; keep the last non-$A0 char
+@trimmed:
+    lda #0
+    sta filename,y
+
+    ; Create UniLib string from filename (PETSCII $20-$5A = ASCII)
+    ldx #<filename
+    ldy #>filename
+    jsr ulstr_fromUtf8
+    bcs @skip
+
+    ; Store in stringtable (1-based index)
+    stx str_tmp
+    sty str_tmp+1
+    lda strtbl_brp
+    sta gREG::r0L
+    lda strtbl_brp+1
+    sta gREG::r0H
+    lda pick_idx
+    inc                         ; convert to 1-based
+    ldx str_tmp
+    ldy str_tmp+1
+    jsr ulstb_put
+
+    ; Release our reference (stringtable has its own)
+    ldx str_tmp
+    ldy str_tmp+1
+    jsr ulstr_release
+
+@skip:
+    inc pick_idx
+    bra @loop
+
+@done:
+    clc
+    rts
+
+@error:
+    sec
+    rts
 .endproc
 
 .proc parse_filenames
     stz zpu_mem
     lda #$a0
     sta zpu_mem+1
-    lda #1
+    lda #ZIF_BASE_BANK
     sta zpu_mem+2
     sta BANK_RAM
     lda #>fnlist
@@ -608,6 +585,11 @@ maincode:
     bra @check_count
 .endproc
 
+.rodata
+
+fontname:       .byte "ZIGGURAT.FNT"
+fontname_len = * - fontname
+
 versionstr: .byte $56, $65, $72, $73, $69, $6f, $6e, $20
 version:    .byte "0.0.8"
             .byte 0
@@ -619,7 +601,6 @@ directory:  .byte $64, $69, $72, $65, $63, $74, $6f, $72, $79, 0
 threedots:  .byte "...", 0
 dollar:     .byte "$"
 choose:     .byte $43, $68, $6f, $6f, $73, $65, $20, $67, $61, $6d, $65, $3a, 0
-
 zigbits:    .byte $20, $97, $96, $84, $9d, $90, $9e, $9f, $98, $9a, $8c, $99, $80, $9c, $9b, $88
 
 zigtitle:   .byte 72, 0, 5, 1, 3, 3, 3, 3
@@ -669,3 +650,23 @@ zigtitle:   .byte 72, 0, 5, 1, 3, 3, 3, 3
             .byte 45, 26, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             .byte 45, 27, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             .byte $ff
+
+; =========================================================================
+; BSS - Launcher temp variables
+; =========================================================================
+.bss
+
+titlewin:       .res 1
+filewin_handle: .res 1       ; Direct UniLib window handle
+fnlen:          .res 1
+fnaddr:         .res 2
+filename:       .res 33      ; 32 chars + NUL (hostfs names can exceed 16)
+fncount:        .res 1
+fnlist:         .res 250 * 4 ; 4 bytes per filename entry
+strtbl_brp:     .res 2       ; Stringtable BRP for picklist
+pick_result:    .res 1       ; Picklist selection (1-based)
+pick_title:     .res 2       ; Title string handle
+pick_idx:       .res 1       ; Build loop counter
+str_tmp:        .res 2       ; Temp string handle
+msg_buf:        .res 32      ; Buffer for loading message
+chunklen:       .res 1

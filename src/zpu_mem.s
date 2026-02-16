@@ -200,8 +200,8 @@ retreat_save: .res 1
 ;
 ; Prerequisite: The ZIF must already be loaded
 .proc memory_init
-    ; Switch to bank 1 so we can read the header
-    pushb #1
+    ; Switch to base bank so we can read the header
+    pushb #ZIF_BASE_BANK
 
     ; Set up the packed address decoder vectors based on the ZIF version
 
@@ -279,8 +279,9 @@ x2loop:
 ;       x - page address (hi)
 ; Out:  x - ZIF byte address (hi)
 .proc encode_baddr
-    ; Byte address hi is low 5 bits of page address plus (bank - 1) * 32
-    dec
+    ; Byte address hi is low 5 bits of page address plus (bank - base) * 32
+    sec
+    sbc #ZIF_BASE_BANK
     asl
     asl
     asl
@@ -307,14 +308,15 @@ x2loop:
     ora #$a0
     tax
 
-    ; Divide hibyte by 32 and add 1 to get bank
+    ; Divide hibyte by 32 and add base bank to get bank
     pla
     lsr
     lsr
     lsr
     lsr
     lsr
-    inc
+    clc
+    adc #ZIF_BASE_BANK
     rts
 .endproc
 
@@ -429,9 +431,9 @@ x2loop:
     lsr gREG::r11H
     ror
 
-    ; And add 1 because we can't use bank 0
+    ; And add base bank offset
     clc
-    adc #1
+    adc #ZIF_BASE_BANK
     rts
 .endproc
 

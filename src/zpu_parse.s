@@ -2,46 +2,7 @@
 .include "zpu.inc"
 .include "zscii_type.inc"
 
-was_buffering = $440
-last_flash = $441
-last_flash_on = $442
-
-read_start_x = $443
-read_start_y = $444
-last_scrl_cnt = $445
-max_chars = $446
-chars_typed = $447
-read_v5 = $448
-term_char = $449
-
-max_words = $44a
-words_typed = $44b
-text_idx = $440
-skip_unknown = $441
-parse_char = $442
-num_seps = $443
-word_dict = $44c
-word_len = $44e
-word_pos = $44f
-word_buf = $500
-
-encoded_buf = $600
-encoded_size = $60f
-max_zchars = $610
-current_zchar = $611
-
-
-entry_count = $444
-entry_size = $446
-dict_0 = $612
-dict_addr = $614
-dict_idx_x2 = $616
-dict_idx_x4 = $618
-dict_idx_x8 = $616
-curr_idx = $61a
-range_begin = $61c
-range_end = $61e
-memreg_save = $620
+; Temp vars are in .bss at end of file
 
 .code
 
@@ -55,10 +16,15 @@ op_input_stream:
     sta gREG::r6H
 ;    jsr printf
 
-    ; Flush the current buffer and reset the scroll count
-    lda current_window
-    jsr win_flushbuffer
-    jsr win_resetscrlcnt
+    ; Reset the scroll count and refresh display before input
+    lda zmwin_current
+    asl
+    asl
+    asl
+    tay
+    lda #0
+    sta zmwin_slots + ZMWIN_SCRLCNT,y
+    jsr ulwin_refresh
 
     ; Read a key from the keyboard
     jsr read_char
@@ -73,18 +39,17 @@ op_input_stream:
 .endproc
 
 .proc read_char
-    ; Turn off buffering if necessary (but remember if it was on)
+    ; Check if buffering is on (read from slot flags)
     phx
     phy
-    lda current_window
-    jsr win_getflags
-    txa
+    lda zmwin_current
+    asl
+    asl
+    asl
+    tay
+    lda zmwin_slots + ZMWIN_FLAGS,y
     and #WIN_BUFFER
     sta was_buffering
-    beq @start_flashing
-    lda current_window
-    ldx #0
-    jsr win_setbuffer
 
 @start_flashing:
     ; Start the cursor flashing
@@ -106,8 +71,7 @@ op_input_stream:
 @flash_off:
     ; Flash cursor off
     ldy #$20
-    clc ; Don't advance cursor
-    jsr win_putchr
+    jsr zmwin_putchr_noadv
 
     ; Flip flash bit and update flash time
     lda last_flash_on
@@ -143,17 +107,7 @@ op_input_stream:
     lda current_window
     ldx #0
     ldy #$20
-    clc ; Don't advance the cursor
-    jsr win_putchr
-    pla
-
-    ; Reenable buffering if we need to
-    bit was_buffering
-    bvc @done
-    pha
-    lda current_window
-    ldx #1
-    jsr win_setbuffer
+    jsr zmwin_putchr_noadv
     pla
 
 @done:
@@ -195,14 +149,20 @@ op_input_stream:
     sta max_chars
     stz chars_typed
 
-    ; Flush the window buffer (if any) and reset the scroll count
-    lda current_window
-    jsr win_flushbuffer
-    jsr win_resetscrlcnt
+    ; Reset the scroll count and refresh display before input
+    lda zmwin_current
+    asl
+    asl
+    asl
+    tay
+    lda #0
+    sta zmwin_slots + ZMWIN_SCRLCNT,y
+    jsr ulwin_refresh
     stz last_scrl_cnt
 
     ; Save the starting entry position
-    jsr win_getcursor
+    lda current_window
+    jsr ulwin_getcursor
     stx read_start_x
     sty read_start_y
 
@@ -226,8 +186,14 @@ op_input_stream:
 
     ; Has the window scrolled?
     tay
-    lda current_window
-    jsr win_getscrlcnt
+    phy
+    lda zmwin_current
+    asl
+    asl
+    asl
+    tay
+    ldx zmwin_slots + ZMWIN_SCRLCNT,y
+    ply
     cpx last_scrl_cnt
     bne @update_startline
     tya
@@ -253,7 +219,7 @@ op_input_stream:
 
     ; Can we back up at all?
     lda current_window
-    jsr win_getcursor
+    jsr ulwin_getcursor
     cpy read_start_y
     bcc @read_loop
     bne @check_beginning
@@ -275,14 +241,15 @@ op_input_stream:
     ; Need to go back one line
     dey
     phy
-    jsr win_getsize
+    lda current_window
+    jsr ulwin_getsize
     ply
 
 @just_back_up:
     ; Step back one character
     dex
     lda current_window
-    jsr win_setcursor
+    jsr ulwin_putcursor
 
     ; Remove a character from the buffer
     lda #1
@@ -302,7 +269,7 @@ op_input_stream:
     tay
     ldx #0
     lda current_window
-    jsr win_putchr
+    jsr zmwin_putchr
     bra @entry_done
 
 @check_term_characters:
@@ -311,11 +278,14 @@ op_input_stream:
     ; Is there room in the buffer?
     ldx chars_typed
     cpx max_chars
-    bcs @read_loop
-
+    bcc :+
+    jmp @read_loop
+:
     ; Is the character valid for output?
     jsr z_isoutput
-    bcc @read_loop
+    bcs :+
+    jmp @read_loop
+:
 
     ; If it's in the ZSCII high range, convert it to Unicode before printing (32-126 matches already)
     cmp #155
@@ -326,8 +296,7 @@ op_input_stream:
     jmp @read_loop
 @print_high:
     lda current_window
-    sec ; Advance the cursor
-    jsr win_putchr
+    jsr zmwin_putchr
     pla
     bra @store_lower
 
@@ -336,8 +305,7 @@ op_input_stream:
     tay
     ldx #0
     lda current_window
-    sec ; Advance the cursor
-    jsr win_putchr
+    jsr zmwin_putchr
     tya
 
 @store_lower:
@@ -1147,3 +1115,50 @@ zscii_encode_map: ; (characters 33-126)
 msg_op_read_char: .byte "Reading @ char", CH::ENTER, 0
 msg_op_read: .byte "Reading input", CH::ENTER, 0
 msg_op_tokenise: .byte "Tokenize buffer @ into @ using dict @ flag=@", CH::ENTER, 0
+
+.bss
+
+; read_char temps
+was_buffering:  .res 1
+last_flash:     .res 1
+last_flash_on:  .res 1
+
+; op_read temps
+read_start_x:   .res 1
+read_start_y:   .res 1
+last_scrl_cnt:   .res 1
+max_chars:       .res 1
+chars_typed:     .res 1
+read_v5:         .res 1
+term_char:       .res 1
+
+; parse_text temps
+max_words:       .res 1
+words_typed:     .res 1
+text_idx:        .res 1
+skip_unknown:    .res 1
+parse_char:      .res 1
+num_seps:        .res 1
+word_dict:       .res 2
+word_len:        .res 1
+word_pos:        .res 1
+word_buf:        .res 80
+
+; encode_word temps
+encoded_buf:     .res 15
+encoded_size:    .res 1
+max_zchars:      .res 1
+current_zchar:   .res 1
+
+; find_encoded_word temps
+entry_count:     .res 2
+entry_size:      .res 1
+dict_0:          .res 2
+dict_addr:       .res 2
+dict_idx_x2:     .res 2
+dict_idx_x4:     .res 2
+dict_idx_x8 = dict_idx_x2
+curr_idx:        .res 2
+range_begin:     .res 2
+range_end:       .res 2
+memreg_save:     .res 3

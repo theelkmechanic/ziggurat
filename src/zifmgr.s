@@ -18,7 +18,12 @@
 
 .proc load_file_to_hiram
     pha
-    lda #1
+    ; Use LFN 2 to avoid conflicts with UniLib font loading (which may use LFN 1)
+    lda #2
+    jsr CLOSE
+    pla
+    pha
+    lda #2
     ldx #8
     ldy #2 ; headerless load
     jsr SETLFS
@@ -26,7 +31,7 @@
     ldx gREG::r0L
     ldy gREG::r0H
     jsr SETNAM
-    pushb #1 ; start at bank 1
+    pushb #ZIF_BASE_BANK ; start at base bank (above UniLib)
     lda #0 ; specify address $A000
     ldx #0
     ldy #$A0

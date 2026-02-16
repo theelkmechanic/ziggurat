@@ -58,7 +58,7 @@ printf_use_chrout: .res 1
     stz printf_use_chrout
     lda #50
     sta line_counter
-    lda #1
+    lda #ZIF_BASE_BANK
     sta BANK_RAM
     ldx ZMheader::version
     beq @bad_version
@@ -214,9 +214,9 @@ printf_use_chrout: .res 1
     lda #<(SCREEN_HEIGHT * FONT_HEIGHT)
     sta ZMheader::height_u+1
 
-    lda #DEFAULT_BG
+    lda #2                  ; Z-machine color 2 = black
     sta ZMheader::dflt_bg
-    lda #DEFAULT_FG
+    lda #10                 ; Z-machine color 10 = light grey
     sta ZMheader::dflt_fg
 
     ; V5 and V6 store font widths backwards from each other
@@ -314,7 +314,10 @@ printf_use_chrout: .res 1
     sta utf_xlat_addr+2
 
 @init_windows:
-    ; Open our windows (main, upper, status, and debug)
+    ; Initialize zmwin slot array
+    jsr zmwin_init
+
+    ; Clear window handles
     ldx #3
     lda #$ff
 @clearwinlist:
@@ -324,76 +327,76 @@ printf_use_chrout: .res 1
     inc
     inc
     sta current_font
-    jsr win_open
+
+    ; Open main window — full screen 80x30
+    stz gREG::r0L               ; left = 0
+    stz gREG::r0H               ; top = 0
+    lda #SCREEN_WIDTH
+    sta gREG::r1L               ; width = 80
+    lda #SCREEN_HEIGHT
+    sta gREG::r1H               ; height = 30
+    lda #DEFAULT_FG
+    sta gREG::r2L               ; foreground
+    lda #DEFAULT_BG
+    sta gREG::r2H               ; background
+    stz gREG::r4L
+    stz gREG::r4H               ; no border
+    jsr ulwin_open
     sta window_main
     sta current_window
-    ldx #SCREEN_WIDTH
-    ldy #SCREEN_HEIGHT
-    jsr win_setsize
-    jsr win_open
-    sta window_upper
-    ldx #SCREEN_WIDTH
-    ldy #0
-    jsr win_setsize
-    chkver V1|V2|V3,@dontneedstatus
-    jsr win_open
-    sta window_status
-    ldy #1
-    jsr win_setsize
-    ldx #0
-    lda window_upper
-    jsr win_setpos
+    stz zmwin_current
+
+    ; Set up main window slot (slot 0)
+    sta zmwin_slots + ZMWIN_HANDLE
+    lda #WIN_BUFFER | WIN_WRAP | WIN_SCROLL
+    sta zmwin_slots + ZMWIN_FLAGS
+    lda #DEFAULT_FG
+    sta zmwin_slots + ZMWIN_FG
+    lda #DEFAULT_BG
+    sta zmwin_slots + ZMWIN_BG
+
+    ; Clear main window and put cursor at bottom
     lda window_main
-    jsr win_setpos
-    jsr win_getsize
+    jsr ulwin_clear
+    lda window_main
+    jsr ulwin_getsize
+    ldx #0
     dey
-    jsr win_setsize
+    lda window_main
+    jsr ulwin_putcursor
+
+    ; Upper window — deferred creation (slot handle = $FF, set by zmwin_init)
+
+    ; Status window (V1-V3 only)
+    chkver V1|V2|V3,@dontneedstatus
+    stz gREG::r0L               ; left = 0
+    stz gREG::r0H               ; top = 0
+    lda #SCREEN_WIDTH
+    sta gREG::r1L               ; width = 80
+    lda #1
+    sta gREG::r1H               ; height = 1
+    lda #DEFAULT_BG             ; status bar: reversed colors
+    sta gREG::r2L               ; foreground = default bg
+    lda #DEFAULT_FG
+    sta gREG::r2H               ; background = default fg
+    stz gREG::r4L
+    stz gREG::r4H               ; no border
+    jsr ulwin_open
+    sta window_status
+    ; Set up status window slot (slot 2)
+    sta zmwin_slots + ZMWIN_SIZE * 2 + ZMWIN_HANDLE
+    lda #DEFAULT_BG
+    sta zmwin_slots + ZMWIN_SIZE * 2 + ZMWIN_FG
+    lda #DEFAULT_FG
+    sta zmwin_slots + ZMWIN_SIZE * 2 + ZMWIN_BG
+    lda window_status
+    jsr ulwin_clear
 
 @dontneedstatus:
-.if SHOW_DEBUG_WINDOW
-    jsr win_open
-    sta window_debug
-    ldy #30-SCREEN_HEIGHT
-    jsr win_setsize
-.endif
-    lda window_main
-    ldx #(DEFAULT_BG << 4) | DEFAULT_FG
-    jsr win_setcolor
-    ldx #1
-    jsr win_setbuffer
-    jsr win_setwrap
-    jsr win_setscroll
-    jsr win_clear
-    jsr win_getsize
-    ldx #0
-    dey
-    lda window_main
-    jsr win_setcursor
-
-    jsr win_getcolor
-    lda window_upper
-    jsr win_setcolor
-
-    lda window_debug
-    bmi @nodebugwindow
-    ldx #0
-    ldy #SCREEN_HEIGHT
-    jsr win_setpos
-    ldx #(W_BLUE << 4) + W_WHITE
-    jsr win_setcolor
-    ldx #1
-    jsr win_setwrap
-    jsr win_setscroll
-    jsr win_clear
-
-@nodebugwindow:
-    chkver V1|V2|V3,@start_zmachine
-    lda window_status
-    ldx #(DEFAULT_FG << 4) | DEFAULT_BG
-    jsr win_setcolor
-    jsr win_clear
-
 @start_zmachine:
+    ; Refresh UniLib display after all window setup
+    jsr ulwin_refresh
+
 ;    jsr debugchrdump
 
     ; Start the Z-machine
@@ -404,14 +407,19 @@ printf_use_chrout: .res 1
 ;    jsr printf
 
     ; Initialize SP/BP to top of low memory (we will grow down)
-    sec
-    jsr MEMTOP
+    ; Note: Can't use MEMTOP here because ULPOOL_init corrupts its XY values.
+    ; Use $9F00 (just below I/O registers) as a safe fixed stack top.
+    ldx #0
+    ldy #$9F
     stx zpu_bp
     sty zpu_bp+1
     stx zpu_sp
     sty zpu_sp+1
 
     ; Initialize the PC based on the init vector in the header
+    ; Ensure we're reading from the correct bank for header
+    lda #ZIF_BASE_BANK
+    sta BANK_RAM
     ldx ZMheader::pc_init
     ldy ZMheader::pc_init+1
 
@@ -472,12 +480,6 @@ printf_use_chrout: .res 1
 ; fetch_and_dispatch - Fetch the next instruction and its operands and dispatch it
 ;                      to the correct handler
 .proc fetch_and_dispatch
-;    lda #<msg_fetch_and_dispatch
-;    sta gREG::r6L
-;    lda #>msg_fetch_and_dispatch
-;    sta gREG::r6H
-;    jsr printf
-
     ; Default to 2OP large, because then we can OR in the correct bits for small constant/variable for 2OP instructions
     lda #$0f
     sta optypes
@@ -749,8 +751,7 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
 .proc printf_putchr
     bit printf_use_chrout
     bmi @use_chrout
-    sec
-    jmp win_putchr
+    jmp zmwin_putchr
 @use_chrout:
     pha
     tya
@@ -995,8 +996,7 @@ optype_shift = gREG::r11L   ; temporary storage for checking operands
     phy
     tay
     lda window_main
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
     ply
     iny
     bne @prtloop
@@ -1030,46 +1030,56 @@ dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
     ldx #0
     ldy #32
 @loopa:
-    sec
-    jsr win_putchr
+    phy
+    jsr zmwin_putchr
+    ldx #0
+    ply
     iny
     cpy #127
     bne @loopa
     ldy #160
 @loopb:
-    sec
-    jsr win_putchr
+    phy
+    jsr zmwin_putchr
+    ldx #0
+    ply
     iny
     bne @loopb
     ldx #1
 @loopc:
-    sec
-    jsr win_putchr
+    phy
+    jsr zmwin_putchr
+    ldx #1
+    ply
     iny
     cpy #128
     bne @loopc
     ldx #$20
     ldy #0
 @loopd:
-    sec
-    jsr win_putchr
+    phy
+    jsr zmwin_putchr
+    ldx #$20
+    ply
     iny
     cpy #$a0
     bne @loopd
     ldx #$25
     ldy #0
 @loope:
-    sec
-    jsr win_putchr
+    phy
+    jsr zmwin_putchr
+    ldx #$25
+    ply
     iny
     cpy #$a0
     bne @loope
     ldx #0
     ldy #$0d
-    sec
-    jsr win_putchr
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
+    ldx #0
+    ldy #$0d
+    jsr zmwin_putchr
 
     lda #<dbgstr_font3
     sta gREG::r6L
@@ -1081,18 +1091,20 @@ dbgstr_font3: .byte "z-machine font 3:", CH::ENTER, 0
     ldx #$e0
     ldy #32
 @loopz:
-    sec
-    jsr win_putchr
+    phy
+    jsr zmwin_putchr
+    ldx #$e0
+    ply
     iny
     cpy #127
     bne @loopz
 
     ldx #0
     ldy #$0d
-    sec
-    jsr win_putchr
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
+    ldx #0
+    ldy #$0d
+    jsr zmwin_putchr
     rts
 .endproc
 

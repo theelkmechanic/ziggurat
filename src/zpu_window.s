@@ -18,25 +18,22 @@
 .endproc
 
 .proc show_status
-@g2 = $480
-@g3 = $482
-@save_op0 = $484
-@timeflags = $486
     ; Start with a space
     pha
     phx
     phy
     lda operand_0
-    sta @save_op0
+    sta ss_save_op0
     lda operand_0+1
-    sta @save_op0+1
+    sta ss_save_op0+1
     lda window_status
     ldx #0
     ldy #0
-    jsr win_setcursor
+    jsr ulwin_putcursor
+    lda window_status
+    ldx #0
     ldy #' '
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
 
     ; Print the encoded name of object in the first global variable (up to 60 characters worth)
     lda #$10
@@ -53,9 +50,9 @@
     lda window_status
     ldx #0
     ldy #' '
-    sec
-    jsr win_putchr
-    jsr win_getcursor
+    jsr zmwin_putchr
+    lda window_status
+    jsr ulwin_getcursor
     cpx #70
     bcc @clear_to_score
 
@@ -63,36 +60,36 @@
     lda #$11
     clc ; Pop stack if needed
     jsr fetch_varvalue
-    stx @g2
-    sty @g2+1
+    stx ss_g2
+    sty ss_g2+1
     lda #$12
     clc ; Pop stack if needed
     jsr fetch_varvalue
-    stx @g3
-    sty @g3+1
-    stz @timeflags
+    stx ss_g3
+    sty ss_g3+1
+    stz ss_timeflags
 
     ; Is this a score or a timed game?
     chkver V3,@show_score_or_time
-    lda #1
+    lda #ZIF_BASE_BANK
     sta BANK_RAM
     lda ZMheader::flags
     and #F1V3_ISTIMED
     beq @show_score_or_time
 
     ; It's a timed game--load the hours from the second global
-    dec @timeflags
-    lda @g2+1
+    dec ss_timeflags
+    lda ss_g2+1
     cmp #12
     bcs @is_pm
 
-    ; For AM, we change to 12 if 0 and clear bit 6 of @timeflags
+    ; For AM, we change to 12 if 0 and clear bit 6 of ss_timeflags
     bne @2
     lda #12
-    sta @g2+1
-@2: lda @timeflags
+    sta ss_g2+1
+@2: lda ss_timeflags
     and #$bf
-    sta @timeflags
+    sta ss_timeflags
     bra @show_score_or_time
 
 @is_pm:
@@ -101,49 +98,47 @@
     sbc #11
     bne @3
     lda #12
-@3: sta @g2+1
+@3: sta ss_g2+1
 
 @show_score_or_time:
-    ; Print @g2
-    lda @g2
+    ; Print ss_g2
+    lda ss_g2
     sta operand_0
-    lda @g2+1
+    lda ss_g2+1
     sta operand_0+1
     sec ; No leading zeroes
     lda window_status
     jsr do_print_num
 
     ; For score game print '/', for timed game print ':'
-    bit @timeflags
+    bit ss_timeflags
     bmi @1
     ldy #'/'
     .byte $2c
 @1: ldy #':'
     ldx #0
-    sec
     lda window_status
-    jsr win_putchr
+    jsr zmwin_putchr
 
-    ; Print @g3 (print two digits if it's a timed game)
-    lda @g3
+    ; Print ss_g3 (print two digits if it's a timed game)
+    lda ss_g3
     sta operand_0
-    lda @g3+1
+    lda ss_g3+1
     sta operand_0+1
     lda #$0
     sec
-    sbc @timeflags
+    sbc ss_timeflags
     lda window_status
     jsr do_print_num
 
     ; For timed game, print AM/PM
-    bit @timeflags
+    bit ss_timeflags
     bpl @finish_status
     php
     lda window_status
     ldx #0
     ldy #' '
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
     plp
     bvc @print_am
     ldy #'p'
@@ -151,25 +146,26 @@
 @print_am:
     ldy #'a'
     ldx #0
-    sec
-    jsr win_putchr
+    lda window_status
+    jsr zmwin_putchr
+    lda window_status
+    ldx #0
     ldy #'m'
-    sec
-    jsr win_putchr
+    jsr zmwin_putchr
 
 @finish_status:
-    ; Print spaces over to column 70
+    ; Print spaces over to column 80
     lda window_status
     ldx #0
     ldy #' '
-    sec
-    jsr win_putchr
-    jsr win_getcursor
+    jsr zmwin_putchr
+    lda window_status
+    jsr ulwin_getcursor
     cpx #80
     bcc @finish_status
-    lda @save_op0
+    lda ss_save_op0
     sta operand_0
-    lda @save_op0+1
+    lda ss_save_op0+1
     sta operand_0+1
     ply
     plx
@@ -184,10 +180,16 @@
     sta gREG::r6H
 ;    jsr printf
 
-    ; Set buffer mode on main window
-    lda window_main
+    ; Set/clear buffer mode in main window slot
+    lda zmwin_slots + ZMWIN_FLAGS
     ldx operand_0+1
-    jsr win_setbuffer
+    beq @buffer_off
+    ora #WIN_BUFFER
+    bra @buffer_done
+@buffer_off:
+    and #WIN_BUFFER ^ $FF
+@buffer_done:
+    sta zmwin_slots + ZMWIN_FLAGS
     jmp fetch_and_dispatch
 .endproc
 
@@ -215,7 +217,7 @@
     dey
     dex
     lda current_window
-    jsr win_setcursor
+    jsr ulwin_putcursor
     jmp fetch_and_dispatch
 .endproc
 
@@ -242,7 +244,7 @@
 
     ; Get the cursor for the current window
     lda current_window
-    jsr win_getcursor
+    jsr ulwin_getcursor
     inx
     iny
 
@@ -314,10 +316,7 @@
     cmp #1
     bne @done
     lda current_window
-    jsr win_getsize
-    cpy #0
-    bne @done
-    jsr win_erasecurrtoeol
+    jsr ulwin_eraseeol
 
 @done:
     jmp fetch_and_dispatch
@@ -352,23 +351,24 @@
 
     ; Erase the upper window
     lda window_upper
-    jsr win_clear
+    jsr ulwin_clear
     bra @done
 
 @erase_main:
     ; Erase the main window
     lda window_main
-    jsr win_clear
+    jsr ulwin_clear
 
     ; For version 4, put the cursor at the bottom
     chkver V4,@done
     lda window_main
-    jsr win_getsize
+    jsr ulwin_getsize
     cpy #2
     bcc @done
     dey
     ldx #0
-    jsr win_setcursor
+    lda window_main
+    jsr ulwin_putcursor
     bra @done
 
 @special:
@@ -379,9 +379,8 @@
     bne @justclear
 
     ; Unsplit and clear
-    lda window_upper
-    jsr win_getsize
-    cpy #0
+    lda zmwin_slots + ZMWIN_SIZE + ZMWIN_HANDLE
+    cmp #$FF
     beq @justclear
     stz operand_0
     stz operand_0+1
@@ -390,25 +389,32 @@
 
 @justclear:
     ; Clear upper and lower windows
+    lda zmwin_slots + ZMWIN_SIZE + ZMWIN_HANDLE
+    cmp #$FF
+    beq @clear_main_only
     lda window_upper
-    jsr win_clear
+    jsr ulwin_clear
+@clear_main_only:
     lda window_main
-    jsr win_clear
+    jsr ulwin_clear
 
     ; For V4, put lower window cursor at bottom line
     chkver V4,@done
     lda window_main
-    jsr win_getsize
+    jsr ulwin_getsize
     cpy #0
     beq @done
     dey
-    sty $420
-    jsr win_getcursor
-    cpy $420
-    bcs @done
-    ldy $420
+    sty ew_temp
+    lda window_main
+    jsr ulwin_getcursor
+    cpy ew_temp
+    bcc :+
+    jmp @done
+:   ldy ew_temp
     ldx #0
-    jsr win_setcursor
+    lda window_main
+    jsr ulwin_putcursor
     jmp @done
 .endproc
 
@@ -419,13 +425,36 @@
     sta gREG::r6H
     jsr printf
 
-    ; Set the appropriate text style
+    ; Set the appropriate text style in slots
     ldx operand_0+1
-    lda window_main
-    jsr win_setstyle
-    lda window_upper
-    jsr win_setstyle
+    beq @clear_style
+    ; OR style into both window slots
+    txa
+    ora zmwin_slots + ZMWIN_STYLE
+    sta zmwin_slots + ZMWIN_STYLE
+    txa
+    ora zmwin_slots + ZMWIN_SIZE + ZMWIN_STYLE
+    sta zmwin_slots + ZMWIN_SIZE + ZMWIN_STYLE
+    bra @update_color
 
+@clear_style:
+    stz zmwin_slots + ZMWIN_STYLE
+    stz zmwin_slots + ZMWIN_SIZE + ZMWIN_STYLE
+
+@update_color:
+    ; Update UniLib color for main window
+    ldy #0
+    lda window_main
+    jsr zmwin_setcolor
+    ; Update UniLib color for upper window (if it exists)
+    lda zmwin_slots + ZMWIN_SIZE + ZMWIN_HANDLE
+    cmp #$FF
+    beq @done
+    ldy #ZMWIN_SIZE
+    lda window_upper
+    jsr zmwin_setcolor
+
+@done:
     jmp fetch_and_dispatch
 .endproc
 
@@ -447,15 +476,19 @@
     ; Set to upper window and move cursor to top left
     lda window_upper
     sta current_window
+    lda #1
+    sta zmwin_current
     ldx #0
     ldy #0
-    jsr win_setcursor
+    lda window_upper
+    jsr ulwin_putcursor
     bra @done
 
 @setmain:
     ; Set to main window
     lda window_main
     sta current_window
+    stz zmwin_current
 
 @done:
     jmp fetch_and_dispatch
@@ -473,27 +506,13 @@
     jmp fetch_and_dispatch
 .endproc
 
+; do_split_window - Overlay model
+;
+; Main window is always full screen (never moved/resized).
+; Upper window overlays on top via UniLib z-ordering.
+; - split N>0: create/resize upper to height N
+; - split 0: close upper (main content revealed)
 .proc do_split_window
-@main_top = $420
-@main_height = $421
-@main_cur_y = $422
-@upper_top = $423
-@upper_height = $424
-@upper_diff = $425
-
-    ; Get the current state of things
-    lda window_main
-    jsr win_getpos
-    sty @main_top
-    jsr win_getsize
-    sty @main_height
-    jsr win_getcursor
-    sty @main_cur_y
-    lda window_upper
-    jsr win_getpos
-    sty @upper_top
-    jsr win_getsize
-    sty @upper_height
 
     ; Are we unsplitting?
     lda operand_0
@@ -504,127 +523,95 @@
     ; Make sure main is current window
     lda window_main
     sta current_window
+    stz zmwin_current
 
-    ; Do we need to unsplit?
-    ldy @upper_height
-    bne @calc_change
-    jmp @done
-
-@calc_change:
-    ; Figure out how many lines we're going to move main up
-    lda @main_top
-    sec
-    sbc @upper_top
-    sta @upper_diff
-
-    ; Move main up, expand it, and move its cursor down, and set upper height to 0
-    lda @main_height
-    clc
-    adc @upper_diff
-    sta @main_height
-    chkver V4,@noforcebottom
-    lda @main_height
-    dec
-    bra @setmaincury
-@noforcebottom:
-    lda @main_cur_y
-    clc
-    adc @upper_diff
-@setmaincury:
-    sta @main_cur_y
-    lda @upper_top
-    sta @main_top
-    stz @upper_height
-    jmp @update_windows
+    ; Is upper window even open?
+    lda zmwin_slots + ZMWIN_SIZE + ZMWIN_HANDLE
+    cmp #$FF
+    bne :+
+    rts
+:
+    ; Close the upper window
+    lda window_upper
+    jsr ulwin_close
+    lda #$FF
+    sta window_upper
+    sta zmwin_slots + ZMWIN_SIZE + ZMWIN_HANDLE
+    rts
 
 @do_split:
-    ; Upper height needs to get set to the param but not more than screen height
+    ; Clamp upper height to screen
     lda operand_0
-    beq @calcupperheight
-    lda #$ff
-    sta operand_0+1
-@calcupperheight:
+    beq @clampheight
     lda #SCREEN_HEIGHT
-    sec
-    sbc @upper_top
-    cmp operand_0+1
-    bcs @upperheightok
     sta operand_0+1
-@upperheightok:
+@clampheight:
     lda operand_0+1
-    sec
-    sbc @upper_height
-    sta @upper_diff
-    bmi @shrinking
-    bne @growing
-    jmp @done
+    cmp #SCREEN_HEIGHT
+    bcc @heightok
+    lda #SCREEN_HEIGHT
+@heightok:
+    sta dsw_upper_height
 
-@growing:
-    ; Grow the upper window and shrink the main window
-    lda @upper_height
-    clc
-    adc @upper_diff
-    sta @upper_height
-    lda @main_top
-    clc
-    adc @upper_diff
-    sta @main_top
-    lda @main_cur_y
-    sec
-    sbc @upper_diff
-    bpl @yinrange
-    lda #0
-@yinrange:
-    sta @main_cur_y
-    lda @main_height
-    sec
-    sbc @upper_diff
-    sta @main_height
-    bra @update_windows
+    ; Is upper window already open?
+    lda zmwin_slots + ZMWIN_SIZE + ZMWIN_HANDLE
+    cmp #$FF
+    beq @create_upper
 
-@shrinking:
-    ; Shrink the upper window and grow the main window
-    lda @upper_height
-    sec
-    sbc @upper_diff
-    sta @upper_height
-    lda @main_top
-    sec
-    sbc @upper_diff
-    sta @main_top
-    lda @main_cur_y
-    clc
-    adc @upper_diff
-    sta @main_cur_y
-    lda @main_height
-    clc
-    adc @upper_diff
-    sta @main_height
-
-@update_windows:
-    ; Update main and upper windows
-    lda window_main
-    jsr win_getpos
-    ldy @main_top
-    jsr win_setpos
-    jsr win_getsize
-    ldy @main_height
-    jsr win_setsize
-    jsr win_getcursor
-    ldy @main_cur_y
-    jsr win_setcursor
+    ; Resize existing upper window
     lda window_upper
-    jsr win_getsize
-    ldy @upper_height
-    jsr win_setsize
+    ldx #SCREEN_WIDTH
+    ldy dsw_upper_height
+    jsr ulwin_resize
+    ; Reset cursor to top-left
     ldx #0
     ldy #0
-    jsr win_setcursor
-
-    ; Clear upper window in V3
+    lda window_upper
+    jsr ulwin_putcursor
+    ; V3: also clear upper window on every split
     chkver V3, @done
     lda window_upper
-    jsr win_clear
+    jsr ulwin_clear
+    bra @done
+
+@create_upper:
+    ; Open upper window
+    stz gREG::r0L               ; left = 0
+    ; Top row depends on version: V1-V3 at row 1 (below status), V4+ at row 0
+    chkver V1|V2|V3, @upper_at_top
+    lda #1                      ; V1-V3: below status bar
+    bra @set_upper_top
+@upper_at_top:
+    lda #0                      ; V4+: at top of screen
+@set_upper_top:
+    sta gREG::r0H
+    lda #SCREEN_WIDTH
+    sta gREG::r1L               ; width = 80
+    lda dsw_upper_height
+    sta gREG::r1H               ; height
+    lda zmwin_slots + ZMWIN_FG  ; inherit main window colors
+    sta gREG::r2L
+    lda zmwin_slots + ZMWIN_BG
+    sta gREG::r2H
+    stz gREG::r4L
+    stz gREG::r4H               ; no border
+    jsr ulwin_open
+    sta window_upper
+    sta zmwin_slots + ZMWIN_SIZE + ZMWIN_HANDLE
+    ; Copy main window colors/style to upper slot
+    lda zmwin_slots + ZMWIN_FG
+    sta zmwin_slots + ZMWIN_SIZE + ZMWIN_FG
+    lda zmwin_slots + ZMWIN_BG
+    sta zmwin_slots + ZMWIN_SIZE + ZMWIN_BG
+    lda zmwin_slots + ZMWIN_STYLE
+    sta zmwin_slots + ZMWIN_SIZE + ZMWIN_STYLE
+    ; Clear and reset cursor
+    lda window_upper
+    jsr ulwin_clear
+    ldx #0
+    ldy #0
+    lda window_upper
+    jsr ulwin_putcursor
 
 @done:
     rts
@@ -645,42 +632,59 @@
     stx gREG::r6H
     jsr printf
 
-    ; Set the appropriate text colors
-    lda window_main
-    jsr win_getcolor
-    lda operand_1+1
-    bne @checkdefaultbg
-    txa
-    and #$f0
-    bra @getfg
-@checkdefaultbg:
-    cmp #1
-    bpl @setbg
-    lda #DEFAULT_BG
-@setbg:
-    asl
-    asl
-    asl
-    asl
-
-@getfg:
-    sta operand_1+1
+    ; Handle foreground: 0=current, 1=default, 2-12=Z-machine color
     lda operand_0+1
-    bne @checkdefaultfg
-    txa
-    bra @setfg
-@checkdefaultfg:
+    beq @fg_current
     cmp #1
-    bpl @setfg
+    beq @fg_default
+    tax
+    lda zmcolor_to_ulcolor,x
+    bra @fg_done
+@fg_default:
     lda #DEFAULT_FG
-@setfg:
-    and #$0f
-    ora operand_1+1
-    lda window_main
-    jsr win_setcolor
-    lda window_upper
-    jsr win_setcolor
+    bra @fg_done
+@fg_current:
+    lda zmwin_slots + ZMWIN_FG
+@fg_done:
+    sta sc_new_fg
 
+    ; Handle background: 0=current, 1=default, 2-12=Z-machine color
+    lda operand_1+1
+    beq @bg_current
+    cmp #1
+    beq @bg_default
+    tax
+    lda zmcolor_to_ulcolor,x
+    bra @bg_done
+@bg_default:
+    lda #DEFAULT_BG
+    bra @bg_done
+@bg_current:
+    lda zmwin_slots + ZMWIN_BG
+@bg_done:
+    sta sc_new_bg
+
+    ; Store to both window slots
+    lda sc_new_fg
+    sta zmwin_slots + ZMWIN_FG
+    sta zmwin_slots + ZMWIN_SIZE + ZMWIN_FG
+    lda sc_new_bg
+    sta zmwin_slots + ZMWIN_BG
+    sta zmwin_slots + ZMWIN_SIZE + ZMWIN_BG
+
+    ; Update UniLib color for main window
+    ldy #0
+    lda window_main
+    jsr zmwin_setcolor
+    ; Update UniLib color for upper window (if it exists)
+    lda zmwin_slots + ZMWIN_SIZE + ZMWIN_HANDLE
+    cmp #$FF
+    beq @done
+    ldy #ZMWIN_SIZE
+    lda window_upper
+    jsr zmwin_setcolor
+
+@done:
     jmp fetch_and_dispatch
 .endproc
 
@@ -713,3 +717,21 @@ msg_op_get_cursor:          .byte "Getting cursor into @", CH::ENTER, 0
 msg_opext_set_font:         .byte "Setting font @", CH::ENTER, 0
 msg_opext_set_font_v6:      .byte "Setting font @ window=@", CH::ENTER, 0
 msg_op_show_status:         .byte "Show status", CH::ENTER, 0
+
+.bss
+
+; show_status temps
+ss_g2:          .res 2
+ss_g3:          .res 2
+ss_save_op0:    .res 2
+ss_timeflags:   .res 1
+
+; do_split_window temps
+dsw_upper_height: .res 1
+
+; op_erase_window temp
+ew_temp:         .res 1
+
+; op_set_colour temps
+sc_new_fg:       .res 1
+sc_new_bg:       .res 1
