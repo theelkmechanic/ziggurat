@@ -35,6 +35,7 @@
 .global ulwin_putcursor
 .global ulwin_getcursor
 .global ulwin_putcolor
+.global ulwin_getchar
 .global ulwin_getcolor
 .global ulwin_getpos
 .global ulwin_getsize

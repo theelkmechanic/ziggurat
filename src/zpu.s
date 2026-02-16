@@ -397,8 +397,6 @@ printf_use_chrout: .res 1
     ; Refresh UniLib display after all window setup
     jsr ulwin_refresh
 
-;    jsr debugchrdump
-
     ; Start the Z-machine
     lda #<msg_launching
     sta gREG::r6L

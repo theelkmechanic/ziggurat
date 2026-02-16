@@ -74,8 +74,28 @@ maincode:
     cli
 
     ; Leave window 0 open — it's the screen window, and UniLib's
-    ; window map/occlusion system depends on it. The shim will
-    ; create additional windows on top of it.
+    ; window map/occlusion system depends on it.
+
+.ifdef QUICK_LOAD
+    ; Quick-load: skip title/picklist, load hardcoded game file directly
+    ldx #0
+@ql_copy:
+    lda quick_filename,x
+    beq @ql_loaded
+    sta filename,x
+    inx
+    bra @ql_copy
+@ql_loaded:
+    stx fnlen
+    lda #>filename
+    sta gREG::r0H
+    lda #<filename
+    sta gREG::r0L
+    lda fnlen
+    ldx #8
+    jsr load_file_to_hiram
+    jmp zpu_start
+.endif
 
     ; Show title screen — open a full-screen window directly via UniLib
     stz gREG::r0L               ; left = 0
@@ -601,6 +621,9 @@ directory:  .byte $64, $69, $72, $65, $63, $74, $6f, $72, $79, 0
 threedots:  .byte "...", 0
 dollar:     .byte "$"
 choose:     .byte $43, $68, $6f, $6f, $73, $65, $20, $67, $61, $6d, $65, $3a, 0
+.ifdef QUICK_LOAD
+quick_filename: .byte "ZORK1.DAT", 0
+.endif
 zigbits:    .byte $20, $97, $96, $84, $9d, $90, $9e, $9f, $98, $9a, $8c, $99, $80, $9c, $9b, $88
 
 zigtitle:   .byte 72, 0, 5, 1, 3, 3, 3, 3

@@ -154,15 +154,9 @@
     jsr zmwin_putchr
 
 @finish_status:
-    ; Print spaces over to column 80
+    ; Clear from cursor to end of status line
     lda window_status
-    ldx #0
-    ldy #' '
-    jsr zmwin_putchr
-    lda window_status
-    jsr ulwin_getcursor
-    cpx #80
-    bcc @finish_status
+    jsr ulwin_eraseeol
     lda ss_save_op0
     sta operand_0
     lda ss_save_op0+1

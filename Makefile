@@ -18,6 +18,11 @@ ASFLAGS       := --cpu 65c02
 UNILIB_INC    := -I $(UNILIBDIR)
 LDFLAGS       := --mapfile ziggurat.map -Ln ziggurat.sym
 
+# Quick-load support: make run-quick / make debug-quick
+ifdef QUICK_LOAD
+QLFLAGS := -D QUICK_LOAD
+endif
+
 # Source files (explicit list — excludes windies_*.s)
 ZPU_SOURCES := \
 	zpu.s \
@@ -49,7 +54,7 @@ THUNKS_OBJ := $(OBJDIR)/unilib_thunks.o
 
 ALL_OBJECTS := $(OBJECTS) $(THUNKS_OBJ)
 
-.PHONY: all clean run debug
+.PHONY: all clean run debug run-quick debug-quick
 
 all: $(PROGRAM)
 
@@ -65,7 +70,7 @@ $(OBJDIR)/zmwin.o: $(SRCDIR)/zmwin.s | $(OBJDIR)
 	ca65 -t $(TARGET) $(ASFLAGS) $(UNILIB_INC) -o $@ $<
 
 $(OBJDIR)/zzmain.o: $(SRCDIR)/zzmain.s | $(OBJDIR)
-	ca65 -t $(TARGET) $(ASFLAGS) $(UNILIB_INC) -o $@ $<
+	ca65 -t $(TARGET) $(ASFLAGS) $(UNILIB_INC) $(QLFLAGS) -o $@ $<
 
 # Compile UniLib thunks
 $(THUNKS_OBJ): $(THUNKS_SRC) | $(OBJDIR)
@@ -85,6 +90,15 @@ run: $(PROGRAM)
 
 # Run with GDB stub on port 2159 for remote debugging
 debug: $(PROGRAM)
+	cd run && $(EMUDIR)/x16emu $(EMUFLAGS) -gdb 2159
+
+# Quick-load: skip title/picklist, load ZORK1.DAT directly
+run-quick: clean
+	$(MAKE) QUICK_LOAD=1
+	cd run && $(EMUDIR)/x16emu $(EMUFLAGS)
+
+debug-quick: clean
+	$(MAKE) QUICK_LOAD=1
 	cd run && $(EMUDIR)/x16emu $(EMUFLAGS) -gdb 2159
 
 clean:

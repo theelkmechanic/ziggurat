@@ -157,6 +157,7 @@ op_input_stream:
     tay
     lda #0
     sta zmwin_slots + ZMWIN_SCRLCNT,y
+
     jsr ulwin_refresh
     stz last_scrl_cnt
 
